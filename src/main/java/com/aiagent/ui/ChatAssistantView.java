@@ -24,6 +24,9 @@ import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
 import javafx.animation.Timeline;
 import javafx.util.Duration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -33,12 +36,20 @@ import java.io.File;
 
 /**
  * 聊天助手视图类，负责显示聊天界面和处理用户交互
+ * 
+ * 主要功能：
+ * - 显示聊天消息列表，支持Markdown格式渲染
+ * - 管理多个会话，支持会话切换
+ * - 文件上传功能（文档和图片）
+ * - 侧边栏显示/隐藏，带滑动动画效果
+ * - 与后端AI接口通信，获取智能回复
+ * 
  * @author jiangtao.shu
  */
 public final class ChatAssistantView extends BorderPane {
-    /** 桌面版宽度 */
+    /** 桌面版宽度 - 用于设置界面默认宽度 */
     private static final double DESKTOP_WIDTH = 1400;
-    /** 移动版断点宽度 */
+    /** 移动版断点宽度 - 小于此宽度时应用移动端样式 */
     private static final double MOBILE_BREAKPOINT = 768;
 
     /** 文档最大字节数 (5MB) */
@@ -50,6 +61,7 @@ public final class ChatAssistantView extends BorderPane {
     private static final Set<String> DOC_EXT = Set.of("pdf", "doc", "docx", "txt");
     /** 支持的图片扩展名 */
     private static final Set<String> IMG_EXT = Set.of("jpg", "jpeg", "png");
+    private static final Logger log = LoggerFactory.getLogger(ChatAssistantView.class);
 
     /** 聊天消息列表 */
     private final ObservableList<ChatMessage> messages = FXCollections.observableArrayList();
@@ -92,8 +104,10 @@ public final class ChatAssistantView extends BorderPane {
 
     /**
      * 构造函数，初始化聊天助手视图
+     * 构建完整的UI布局：顶部标题栏、侧边栏、聊天区域和输入区域
      */
     public ChatAssistantView() {
+        // 设置页面样式类
         getStyleClass().add("page");
         setPrefWidth(DESKTOP_WIDTH);
 
@@ -102,37 +116,39 @@ public final class ChatAssistantView extends BorderPane {
         mainContent.setFillWidth(true);
         mainContent.setSpacing(0); // 移除间距，实现无缝衔接
         
-        // 构建聊天区域（历史消息）
+        // 构建聊天区域（历史消息显示区域）
         var chatArea = buildChatArea();
         VBox.setVgrow(chatArea, Priority.ALWAYS); // 让聊天区域占据所有可用空间
         
-        // 构建输入区域
+        // 构建输入区域（包含输入框和工具栏）
         var inputArea = buildInputArea();
         
         // 将聊天区域和输入区域添加到主内容区域
         mainContent.getChildren().addAll(chatArea, inputArea);
 
-        // 构建侧边栏
+        // 构建侧边栏（会话列表）
         buildSidebar();
         
         // 创建主布局容器（包含侧边栏和主内容）
         var mainContainer = new HBox();
         mainContainer.getChildren().addAll(sidebar, mainContent);
-        HBox.setHgrow(mainContent, Priority.ALWAYS);
+        HBox.setHgrow(mainContent, Priority.ALWAYS); // 主内容区域自动扩展
         
+        // 设置顶部标题栏和中心内容区域
         setTop(buildHeader());
         setCenter(mainContainer);
 
-        // 创建初始会话
+        // 初始化：创建初始会话、显示欢迎消息、绑定事件处理
         createNewSession();
-        
-        seedWelcome();
-        wireBehavior();
+        seedWelcome(); // 显示欢迎消息
+        wireBehavior(); // 绑定各种事件处理器
     }
 
     /**
      * 构建顶部标题栏
-     * @return 标题栏节点
+     * 包含：侧边栏切换按钮、应用图标和标题
+     * 
+     * @return 标题栏节点（HBox容器）
      */
     private Node buildHeader() {
         var header = new HBox(16);
@@ -162,6 +178,8 @@ public final class ChatAssistantView extends BorderPane {
     
     /**
      * 构建侧边栏
+     * 包含：新建会话按钮和会话列表
+     * 侧边栏支持滑动动画显示/隐藏
      */
     private void buildSidebar() {
         sidebar.getStyleClass().add("sidebar");
@@ -170,6 +188,8 @@ public final class ChatAssistantView extends BorderPane {
         sidebar.setMaxWidth(350);
         sidebar.setPadding(new Insets(16, 12, 16, 12));
         sidebar.setSpacing(12);
+        // 初始化时侧边栏可见，translateX为0
+        sidebar.setTranslateX(0);
         
         // 新建会话按钮
         newSessionBtn.getStyleClass().add("new-session-btn");
@@ -209,16 +229,60 @@ public final class ChatAssistantView extends BorderPane {
     }
     
     /**
-     * 切换侧边栏显示/隐藏
+     * 切换侧边栏显示/隐藏（带滑动动画）
+     * 使用Timeline动画实现平滑的宽度变化效果，提升用户体验
      */
     private void toggleSidebar() {
         sidebarVisible = !sidebarVisible;
-        sidebar.setVisible(sidebarVisible);
-        sidebar.setManaged(sidebarVisible);
+        double targetWidth = 280; // 侧边栏目标宽度
+        
+        if (sidebarVisible) {
+            // 显示侧边栏：从宽度0滑入到目标宽度（400毫秒动画）
+            sidebar.setVisible(true);
+            sidebar.setManaged(true);
+            sidebar.setPrefWidth(0); // 初始宽度为0
+            sidebar.setMinWidth(0);
+            
+            // 创建滑入动画：宽度从0增加到目标宽度
+            Timeline slideIn = new Timeline(
+                new KeyFrame(Duration.ZERO, 
+                    new KeyValue(sidebar.prefWidthProperty(), 0),
+                    new KeyValue(sidebar.minWidthProperty(), 0)),
+                new KeyFrame(Duration.millis(400), // 动画时长400毫秒
+                    new KeyValue(sidebar.prefWidthProperty(), targetWidth),
+                    new KeyValue(sidebar.minWidthProperty(), 250))
+            );
+            slideIn.setCycleCount(1); // 只播放一次
+            slideIn.play();
+        } else {
+            // 隐藏侧边栏：从当前宽度滑出到0（400毫秒动画）
+            double currentWidth = sidebar.getWidth() > 0 ? sidebar.getWidth() : targetWidth;
+            
+            // 创建滑出动画：宽度从当前宽度减少到0
+            Timeline slideOut = new Timeline(
+                new KeyFrame(Duration.ZERO, 
+                    new KeyValue(sidebar.prefWidthProperty(), currentWidth),
+                    new KeyValue(sidebar.minWidthProperty(), 250)),
+                new KeyFrame(Duration.millis(400), // 动画时长400毫秒
+                    new KeyValue(sidebar.prefWidthProperty(), 0),
+                    new KeyValue(sidebar.minWidthProperty(), 0))
+            );
+            slideOut.setCycleCount(1); // 只播放一次
+            // 动画完成后隐藏侧边栏并恢复原始宽度设置
+            slideOut.setOnFinished(event -> {
+                sidebar.setVisible(false);
+                sidebar.setManaged(false);
+                // 恢复原始宽度设置，以便下次显示时使用
+                sidebar.setPrefWidth(targetWidth);
+                sidebar.setMinWidth(250);
+            });
+            slideOut.play();
+        }
     }
     
     /**
      * 创建新会话
+     * 创建一个新的ChatSession对象，添加到会话列表，并切换到该会话
      */
     private void createNewSession() {
         ChatSession newSession = new ChatSession();
@@ -229,7 +293,9 @@ public final class ChatAssistantView extends BorderPane {
     
     /**
      * 切换到指定会话
-     * @param session 要切换到的会话
+     * 保存当前会话状态，加载目标会话的消息和文件列表
+     * 
+     * @param session 要切换到的会话对象
      */
     private void switchToSession(ChatSession session) {
         // 保存当前会话状态（排除欢迎消息）
@@ -271,8 +337,10 @@ public final class ChatAssistantView extends BorderPane {
     
     /**
      * 判断是否是欢迎消息
+     * 欢迎消息是AI发送的初始提示消息，不应保存到会话历史中
+     * 
      * @param message 消息对象
-     * @return 是否是欢迎消息
+     * @return 如果是欢迎消息返回true，否则返回false
      */
     private boolean isWelcomeMessage(ChatMessage message) {
         if (message.getRole() != ChatMessage.Role.AI) {
@@ -284,7 +352,9 @@ public final class ChatAssistantView extends BorderPane {
 
     /**
      * 构建聊天区域
-     * @return 聊天区域节点
+     * 包含消息列表和滚动容器，用于显示聊天历史
+     * 
+     * @return 聊天区域节点（StackPane容器）
      */
     private Node buildChatArea() {
         var outer = new StackPane();
@@ -313,7 +383,9 @@ public final class ChatAssistantView extends BorderPane {
 
     /**
      * 构建输入区域
-     * @return 输入区域节点
+     * 包含：文件上传区域、文本输入框、工具栏（模型选择、附件、发送等按钮）
+     * 
+     * @return 输入区域节点（VBox容器）
      */
     private Node buildInputArea() {
         // 创建主容器，使用VBox
@@ -375,7 +447,7 @@ public final class ChatAssistantView extends BorderPane {
 
         var modelArrowBtn = new Button();
         modelArrowBtn.getStyleClass().addAll("icon-btn", "model-arrow-btn");
-        modelArrowBtn.setGraphic(loadIcon("/icons/arrow-exchange.png", "↔"));
+        modelArrowBtn.setGraphic(loadIcon("/icons/arrow-exchange.png", "\uD83D\uDD04"));
         modelArrowBtn.setTooltip(new Tooltip("切换模型"));
 
         // 创建工具按钮区域
@@ -402,7 +474,7 @@ public final class ChatAssistantView extends BorderPane {
         var imageBtn = new Button();
         imageBtn.getStyleClass().addAll("icon-btn", "image-btn");
         imageBtn.setTooltip(new Tooltip("上传图片"));
-        imageBtn.setGraphic(loadIcon("/icons/image.png", "🖼️"));
+        imageBtn.setGraphic(loadIcon("/icons/image.png", "\uD83D\uDCC6"));
 
         sendBtn.getStyleClass().add("send-btn");
         sendBtn.setDefaultButton(true);
@@ -416,8 +488,10 @@ public final class ChatAssistantView extends BorderPane {
 
     /**
      * 创建文件项组件
-     * @param file 上传的文件项
-     * @return 文件项组件
+     * 显示文件图标、文件名、重新上传提示和删除按钮
+     * 
+     * @param file 上传的文件项对象
+     * @return 文件项组件（HBox容器）
      */
     private HBox createFileItem(UploadedFileItem file) {
         var fileItem = new HBox(8);
@@ -456,6 +530,8 @@ public final class ChatAssistantView extends BorderPane {
 
     /**
      * 添加欢迎消息
+     * 在消息列表为空时显示欢迎消息，提示用户如何使用应用
+     * 欢迎消息不会保存到会话历史中
      */
     private void seedWelcome() {
         // 只在消息列表为空时添加欢迎消息，且不保存到会话中
@@ -473,6 +549,11 @@ public final class ChatAssistantView extends BorderPane {
 
     /**
      * 绑定事件处理
+     * 设置各种UI组件的事件监听器：
+     * - 消息列表变化时自动滚动到底部
+     * - 文件列表和输入框变化时更新发送按钮状态
+     * - 键盘快捷键（Enter发送，Shift+Enter换行）
+     * - 窗口大小变化时应用响应式布局
      */
     private void wireBehavior() {
         messages.addListener((ListChangeListener<ChatMessage>) c -> Platform.runLater(this::scrollToBottom));
@@ -504,7 +585,9 @@ public final class ChatAssistantView extends BorderPane {
 
     /**
      * 应用响应式布局
-     * @param width 当前宽度
+     * 根据窗口宽度调整UI布局，小于768px时应用移动端样式
+     * 
+     * @param width 当前窗口宽度
      */
     private void applyResponsive(double width) {
         boolean mobile = width > 0 && width < MOBILE_BREAKPOINT;
@@ -520,6 +603,8 @@ public final class ChatAssistantView extends BorderPane {
 
     /**
      * 调整文本区域高度
+     * 根据输入文本的行数动态调整输入框高度，范围在50-150像素之间
+     * 每行大约18像素高度
      */
     private void clampTextAreaHeight() {
         // Simple approximation: rows based on line count, clamped to [50,150]
@@ -530,6 +615,7 @@ public final class ChatAssistantView extends BorderPane {
 
     /**
      * 更新发送按钮状态
+     * 当有输入文本或上传文件时启用发送按钮，否则禁用
      */
     private void updateSendEnabled() {
         boolean hasText = input.getText() != null && !input.getText().trim().isEmpty();
@@ -539,7 +625,9 @@ public final class ChatAssistantView extends BorderPane {
 
     /**
      * 选择文件
-     * @param imagesOnly 是否只选择图片
+     * 打开文件选择对话框，允许用户选择一个或多个文件
+     * 
+     * @param imagesOnly 如果为true，只允许选择图片文件；如果为false，可以选择文档或图片
      */
     private void chooseFiles(boolean imagesOnly) {
         var chooser = new FileChooser();
@@ -569,8 +657,10 @@ public final class ChatAssistantView extends BorderPane {
 
     /**
      * 验证并添加文件
-     * @param file 要添加的文件
-     * @return 是否添加成功
+     * 检查文件格式、大小和是否重复，验证通过后添加到上传文件列表
+     * 
+     * @param file 要添加的文件对象
+     * @return 如果文件验证通过并成功添加返回true，否则返回false
      */
     private boolean validateAndAdd(File file) {
         String ext = getExt(file.getName());
@@ -604,56 +694,64 @@ public final class ChatAssistantView extends BorderPane {
     }
 
     /**
-     * 发送消息
+     * 发送消息：处理用户输入，调用AI接口，更新UI
+     * 流程：1. 创建会话（如需要） 2. 添加用户消息 3. 显示加载状态 4. 异步调用AI 5. 显示AI回复
      */
     private void send() {
+        // 如果当前没有会话，创建一个新会话
         if (currentSession == null) {
             createNewSession();
         }
-        
-        String text = input.getText() == null ? "" : input.getText().trim();
-        var filesSnapshot = List.copyOf(uploadedFiles);
 
-        // 移除欢迎消息（如果存在）
+        // 获取用户输入的文本和上传的文件
+        String text = input.getText() == null ? "" : input.getText().trim();
+        var filesSnapshot = List.copyOf(uploadedFiles); // 创建文件列表的快照
+
+        // 移除欢迎消息（如果存在），因为用户已经开始对话
         messages.removeIf(this::isWelcomeMessage);
 
-        // 添加用户消息
+        // 添加用户消息到消息列表和当前会话
         ChatMessage userMessage = new ChatMessage(ChatMessage.Role.USER, buildUserPayload(text, filesSnapshot), LocalDateTime.now());
         messages.add(userMessage);
         currentSession.addMessage(userMessage);
+        
+        // 清空输入框和文件列表，准备下一次输入
         input.clear();
         uploadedFiles.clear();
         
-        // 添加加载中的消息
+        // 添加加载中的消息，提示用户AI正在处理
         ChatMessage loadingMessage = new ChatMessage(ChatMessage.Role.AI, "loading", LocalDateTime.now());
         messages.add(loadingMessage);
         
-        // 禁用发送按钮并更改文本为"处理中..."
+        // 禁用发送按钮并更改文本为"处理中..."，防止重复发送
         sendBtn.setDisable(true);
         String originalText = sendBtn.getText();
         sendBtn.setText("处理中...");
 
-        // 异步调用AI接口
+        // 在后台线程中异步调用AI接口（避免阻塞UI线程）
         new Thread(() -> {
             try {
-                String aiResponse = callAiApi(text);
-                // 在JavaFX应用线程中添加AI回复
+                // 调用AI接口获取回复
+                String aiResponse = callAiApi(text,threadId);
+                // 在JavaFX应用线程中更新UI（必须在UI线程中操作JavaFX组件）
                 Platform.runLater(() -> {
                     // 移除加载中的消息
                     messages.remove(loadingMessage);
-                    // 添加AI回复
-                    ChatMessage aiMessage = new ChatMessage(ChatMessage.Role.AI, aiResponse, LocalDateTime.now());
+                    // 添加AI回复（确保响应文本不为null）
+                    String responseText = aiResponse != null ? aiResponse : "抱歉，未收到有效响应。";
+                    ChatMessage aiMessage = new ChatMessage(ChatMessage.Role.AI, responseText, LocalDateTime.now());
                     messages.add(aiMessage);
-                    currentSession.addMessage(aiMessage);
-                    // 刷新会话列表以更新标题
+                    currentSession.addMessage(aiMessage); // 保存到会话历史
+                    // 刷新会话列表以更新标题（会话标题可能基于第一条消息生成）
                     sessionList.refresh();
                     // 恢复发送按钮状态
                     sendBtn.setText(originalText);
                     sendBtn.setDisable(false);
                 });
             } catch (Exception e) {
+                // 捕获异常并显示错误消息
                 e.printStackTrace();
-                // 发生错误时也恢复发送按钮状态
+                // 在UI线程中显示错误信息
                 Platform.runLater(() -> {
                     // 移除加载中的消息
                     messages.remove(loadingMessage);
@@ -672,50 +770,60 @@ public final class ChatAssistantView extends BorderPane {
     }
 
     /**
-     * 调用AI接口
+     * 调用AI接口，发送用户查询并获取AI回复
+     * 
      * @param query 用户查询文本
-     * @return AI回复内容
+     * @return AI回复内容，如果出错则返回错误提示信息
      */
-    private String callAiApi(String query) {
+    private String callAiApi(String query, String threadId) {
         try {
-            // 构建请求URL
+            // 构建请求URL（后端AI服务地址）
             URL url = new URL("http://localhost:8090/aiAgent/chat");
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
 
-            // 设置请求方法和头信息
-            connection.setRequestMethod("POST");
-            connection.setRequestProperty("Content-Type", "application/json");
-            connection.setDoOutput(true);
-
-            Map<String, String> queryMap = new HashMap<>();
+            // 构建请求参数
+            Map<String, Object> queryMap = new HashMap<>();
             queryMap.put("query", query);
+            queryMap.put("threadId", threadId);
 
-            // 构建请求体
-            String requestBody = JSON.toJSONString(queryMap);
+            // 关键配置：设置请求方式和请求头，确保后台识别 JSON 格式（之前可能缺少这部分）
+            connection.setRequestMethod("POST");
+            connection.setDoOutput(true);
+            connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+            connection.setRequestProperty("Accept", "application/json");
 
-            // 发送请求
+            // 发送请求体到服务器
             try (java.io.OutputStream os = connection.getOutputStream()) {
-                byte[] input = requestBody.getBytes(StandardCharsets.UTF_8);
+                byte[] input = JSON.toJSONString(queryMap).getBytes(StandardCharsets.UTF_8);
                 os.write(input, 0, input.length);
             }
 
-            // 读取响应
+            // 读取服务器响应
             int responseCode = connection.getResponseCode();
             if (responseCode == HttpURLConnection.HTTP_OK) {
+                // 成功响应：读取响应内容
                 try (java.io.BufferedReader br = new java.io.BufferedReader(
                         new java.io.InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
                     StringBuilder response = new StringBuilder();
                     String responseLine;
+                    boolean firstLine = true;
+                    // 逐行读取响应，保留换行符以支持Markdown格式
                     while ((responseLine = br.readLine()) != null) {
+                        if (!firstLine) {
+                            response.append("\n"); // 保留换行符，这对Markdown格式很重要
+                        }
                         response.append(responseLine);
+                        firstLine = false;
                     }
                     return response.toString();
                 }
             } else {
+                // HTTP错误响应
                 return "抱歉，调用AI接口失败，错误码：" + responseCode;
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            // 捕获所有异常并返回友好的错误提示
+            log.error(e.getMessage(),e);
             return "抱歉，调用AI接口时发生错误：" + e.getMessage();
         }
     }
@@ -766,9 +874,11 @@ public final class ChatAssistantView extends BorderPane {
 
     /**
      * 构建用户消息内容
-     * @param text 用户输入文本
+     * 将用户输入的文本和上传的文件信息组合成完整的消息内容
+     * 
+     * @param text 用户输入的文本
      * @param files 上传的文件列表
-     * @return 构建后的消息内容
+     * @return 构建后的消息内容字符串
      */
     private String buildUserPayload(String text, List<UploadedFileItem> files) {
         var sb = new StringBuilder();
@@ -806,6 +916,8 @@ public final class ChatAssistantView extends BorderPane {
 
     /**
      * 滚动到底部
+     * 将消息列表滚动到最底部，显示最新的消息
+     * 在添加新消息或切换会话时调用
      */
     private void scrollToBottom() {
         if (messages.isEmpty()) {
@@ -817,8 +929,10 @@ public final class ChatAssistantView extends BorderPane {
 
     /**
      * 获取文件扩展名
-     * @param name 文件名
-     * @return 扩展名（小写）
+     * 从文件名中提取扩展名并转换为小写
+     * 
+     * @param name 文件名（可能包含路径）
+     * @return 文件扩展名（小写），如果没有扩展名则返回空字符串
      */
     private static String getExt(String name) {
         int idx = name.lastIndexOf('.');
@@ -830,8 +944,10 @@ public final class ChatAssistantView extends BorderPane {
 
     /**
      * 显示提示对话框
-     * @param title 标题
-     * @param content 内容
+     * 显示一个信息提示对话框，用于向用户展示错误或提示信息
+     * 
+     * @param title 对话框标题
+     * @param content 对话框内容文本
      */
     private static void alert(String title, String content) {
         var a = new Alert(Alert.AlertType.INFORMATION);
@@ -843,9 +959,11 @@ public final class ChatAssistantView extends BorderPane {
 
     /**
      * 加载图标
-     * @param resourcePath 资源路径
-     * @param fallbackEmoji  fallback表情
-     * @return 图标节点
+     * 从资源文件加载图标，如果加载失败则使用fallback表情符号
+     * 
+     * @param resourcePath 图标资源路径（相对于resources目录）
+     * @param fallbackEmoji 如果图标文件不存在时使用的fallback表情符号
+     * @return 图标节点（ImageView或Text）
      */
     private static Node loadIcon(String resourcePath, String fallbackEmoji) {
         try {
@@ -868,6 +986,8 @@ public final class ChatAssistantView extends BorderPane {
 
     /**
      * 消息单元格类，用于显示聊天消息
+     * 负责渲染单个消息气泡，支持Markdown格式、加载动画等
+     * 根据消息角色（用户/AI）显示不同的样式和对齐方式
      */
     private static final class MessageCell extends ListCell<ChatMessage> {
         @Override
@@ -910,19 +1030,35 @@ public final class ChatAssistantView extends BorderPane {
                 return;
             }
 
-            var bubble = new Label(item.getText());
-            bubble.setWrapText(true);
-            bubble.getStyleClass().add("bubble");
-            bubble.setMaxWidth(600); // 增加默认最大宽度
+            // 使用Markdown渲染器渲染消息内容
+            // 根据消息角色设置不同的文本颜色：用户消息为蓝色，AI消息为灰色
+            String textColor = item.getRole() == ChatMessage.Role.USER ? "#1e40af" : "#334155";
+            VBox markdownContent = MarkdownRenderer.render(item.getText(), 16, textColor);
+            markdownContent.setMaxWidth(600); // 设置最大宽度，防止消息气泡过宽
+            markdownContent.getStyleClass().add("bubble-content");
 
+            // 创建消息气泡容器（VBox用于垂直布局，支持代码块等块级元素）
+            var bubble = new VBox();
+            bubble.getStyleClass().add("bubble");
+            bubble.getChildren().add(markdownContent);
+            bubble.setMaxWidth(600);
+
+            // 创建消息行容器（HBox用于水平布局，控制消息对齐方式）
             var row = new HBox();
             row.getStyleClass().add("bubble-row");
-            // 监听父容器宽度变化，动态调整气泡最大宽度
+            // 监听父容器宽度变化，动态调整气泡最大宽度（响应式布局）
             row.widthProperty().addListener((obs, oldWidth, newWidth) -> {
                 if (newWidth.doubleValue() > 0) {
-                    // 气泡最大宽度为父容器宽度的 90%，增加宽度
+                    // 气泡最大宽度为父容器宽度的 90%，留出边距
                     double maxWidth = newWidth.doubleValue() * 0.9;
                     bubble.setMaxWidth(maxWidth);
+                    markdownContent.setMaxWidth(maxWidth - 24); // 减去气泡的padding（左右各12px）
+                    // 更新代码块的最大宽度（代码块需要额外的边距）
+                    markdownContent.getChildren().forEach(child -> {
+                        if (child instanceof Region && child.getStyleClass().contains("code-block")) {
+                            ((Region) child).setMaxWidth(maxWidth - 48); // 减去更多的边距
+                        }
+                    });
                 }
             });
 
@@ -979,6 +1115,8 @@ public final class ChatAssistantView extends BorderPane {
     
     /**
      * 会话单元格类，用于显示会话列表项
+     * 显示会话标题和更新时间，支持选中状态高亮
+     * 时间显示格式：今天显示时间，昨天显示"昨天"，更早显示日期
      */
     private static final class SessionCell extends ListCell<ChatSession> {
         private final VBox container = new VBox(4);

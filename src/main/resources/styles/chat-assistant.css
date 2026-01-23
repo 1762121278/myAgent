@@ -107,6 +107,32 @@
     -fx-text-fill: #334155; /* 深灰色文本 */
 }
 
+/* Markdown content styles */
+.bubble-content {
+    -fx-wrap-text: true;
+}
+
+/* Code block styles */
+.code-block {
+    -fx-background-color: #1e293b;
+    -fx-background-radius: 8;
+    -fx-padding: 12;
+    -fx-font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    -fx-font-size: 14px;
+    -fx-pref-width: -1;
+    -fx-max-width: 600;
+}
+
+/* Inline code styles */
+.inline-code {
+    -fx-fill: #dc2626;
+    -fx-background-color: #fef2f2;
+    -fx-background-radius: 4;
+    -fx-padding: 2 4 2 4;
+    -fx-font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    -fx-font-size: 14px;
+}
+
 /* Loading styles */
 .loading-container {
     -fx-background-color: #f1f5f9;
