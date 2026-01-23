@@ -1,0 +1,519 @@
+/* Light Blue Theme Styles */
+
+/* Base styles */
+.page {
+    -fx-background-color: #f8fafc; /* 浅色背景 */
+    -fx-text-fill: #1e293b; /* 默认深色文本 */
+    -fx-border-color: #e2e8f0; /* 浅灰色边框 */
+    -fx-border-width: 1px; /* 边框宽度 */
+    -fx-border-radius: 8px; /* 边框圆角 */
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.05), 10, 0.1, 0, 0); /* 轻微阴影效果 */
+}
+
+/* Header styles */
+.header {
+    -fx-background-color: #ffffff; /* 白色背景 */
+    -fx-border-color: #e2e8f0; /* 浅灰色边框 */
+    -fx-border-width: 0 0 1 0; /* 底部边框 */
+}
+
+.brand-icon {
+    -fx-font-size: 24px;
+}
+
+.brand-title {
+    -fx-font-size: 18px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #3b82f6; /* 蓝色文本 */
+}
+
+/* Chat area styles */
+.chat-outer {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #e2e8f0;
+    -fx-border-width: 0 0 0 0; /* 移除边框，与输入框无缝衔接 */
+    -fx-border-radius: 0;
+    -fx-padding: 0; /* 移除内边距，让内容区域更大 */
+    -fx-margin: 0;
+}
+
+.message-list {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+    -fx-cell-size: -1;
+}
+
+.message-list .list-cell {
+    -fx-padding: 4 0 4 0; /* 减少单元格垂直间距 */
+    -fx-background-color: transparent;
+}
+
+.message-list .scroll-bar:vertical {
+    -fx-background-color: #f1f5f9; /* 浅灰色背景 */
+    -fx-background-radius: 6;
+    -fx-pref-width: 8;
+}
+
+.message-list .scroll-bar:vertical .thumb {
+    -fx-background-color: #cbd5e1; /* 中灰色滑块 */
+    -fx-background-radius: 4;
+}
+
+.message-list .scroll-bar:vertical .track {
+    -fx-background-color: #f1f5f9; /* 浅灰色轨道 */
+    -fx-background-radius: 6;
+}
+
+/* Message scroll pane styles */
+.message-scroll {
+    -fx-background-color: transparent;
+    -fx-padding: 16; /* 在滚动面板内部添加内边距，让内容有呼吸空间 */
+}
+
+.message-scroll .viewport {
+    -fx-background-color: transparent;
+}
+
+/* Message bubble styles */
+.message-bubble {
+    -fx-border-radius: 12;
+    -fx-background-radius: 12;
+    -fx-padding: 12;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 5, 0.2, 0, 0);
+}
+
+.bubble {
+    -fx-border-radius: 12;
+    -fx-background-radius: 12;
+    -fx-padding: 12;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 5, 0.2, 0, 0);
+    -fx-font-size: 16px;
+    -fx-line-spacing: 6px;
+    -fx-max-width: 800px;
+    -fx-pref-width: -1;
+    -fx-alignment: top-left;
+    -fx-border-width: 1px;
+}
+
+.bubble-user {
+    -fx-background-color: #dbeafe; /* 浅蓝色背景 */
+    -fx-border-color: #bfdbfe; /* 蓝色边框 */
+    -fx-text-fill: #1e40af; /* 深蓝色文本 */
+}
+
+.bubble-ai {
+    -fx-background-color: #f1f5f9; /* 浅灰色背景 */
+    -fx-border-color: #e2e8f0; /* 灰色边框 */
+    -fx-text-fill: #334155; /* 深灰色文本 */
+}
+
+/* Loading styles */
+.loading-container {
+    -fx-background-color: #f1f5f9;
+    -fx-border-color: #e2e8f0;
+    -fx-border-radius: 12;
+    -fx-background-radius: 12;
+    -fx-spacing: 8;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 5, 0.2, 0, 0);
+}
+
+.loading-text {
+    -fx-text-fill: #64748b;
+    -fx-font-size: 14px;
+}
+
+.loading-indicator {
+    -fx-text-fill: #3b82f6;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+}
+
+.message-time {
+    -fx-text-fill: #94a3b8; /* 浅灰色时间文本 */
+    -fx-font-size: 14px;
+}
+
+.message-content {
+    -fx-font-size: 16px;
+    -fx-line-spacing: 6px;
+}
+
+/* Composer styles */
+.composer {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #e2e8f0;
+    -fx-border-width: 1px 0 0 0; /* 只保留顶部边框，与聊天区域无缝衔接 */
+    -fx-border-radius: 0; /* 移除圆角，实现无缝衔接 */
+    -fx-padding: 12px 16px 16px 16px;
+    -fx-effect: none; /* 移除阴影，实现无缝衔接 */
+}
+
+.input {
+    -fx-background-color: #f8fafc; /* 浅色背景 */
+    -fx-border-color: #e2e8f0; /* 浅灰色边框 */
+    -fx-border-radius: 12;
+    -fx-background-radius: 12;
+    -fx-text-fill: #1e293b; /* 深色文本 */
+    -fx-prompt-text-fill: #94a3b8; /* 浅灰色提示文本 */
+    -fx-padding: 12;
+    -fx-wrap-text: true;
+    -fx-font-size: 16px;
+}
+
+.input:focused {
+    -fx-border-color: #3b82f6; /* 蓝色边框 */
+    -fx-effect: dropshadow(gaussian, rgba(59,130,246,0.2), 10, 0.3, 0, 0); /* 轻微发光效果 */
+}
+
+/* Button styles */
+.icon-btn {
+    -fx-background-color: #f1f5f9; /* 浅灰色背景 */
+    -fx-border-color: #e2e8f0; /* 浅灰色边框 */
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 10; /* 增大按钮内边距 */
+    -fx-cursor: hand;
+}
+
+.icon-btn:hover {
+    -fx-background-color: #e2e8f0; /* 中灰色背景 */
+    -fx-border-color: #cbd5e1; /* 中灰色边框 */
+}
+
+.send-btn {
+    -fx-background-color: #3b82f6; /* 蓝色背景 */
+    -fx-text-fill: #ffffff; /* 白色文本 */
+    -fx-border-color: #3b82f6; /* 蓝色边框 */
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 10 16;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-cursor: hand;
+}
+
+.send-btn:hover {
+    -fx-background-color: #2563eb; /* 深蓝色背景 */
+    -fx-border-color: #2563eb; /* 深蓝色边框 */
+}
+
+.send-btn:disabled {
+    -fx-background-color: #f1f5f9; /* 浅灰色背景 */
+    -fx-border-color: #e2e8f0; /* 浅灰色边框 */
+    -fx-text-fill: #94a3b8; /* 浅灰色文本 */
+    -fx-cursor: default;
+}
+
+/* Tool button styles */
+.tool-btn {
+    -fx-background-color: #f1f5f9; /* 浅灰色背景 */
+    -fx-border-color: #e2e8f0; /* 浅灰色边框 */
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-text-fill: #1e293b; /* 深色文本 */
+    -fx-padding: 8 12;
+    -fx-font-size: 14px;
+    -fx-cursor: hand;
+}
+
+.tool-btn:hover {
+    -fx-background-color: #e2e8f0; /* 中灰色背景 */
+    -fx-border-color: #cbd5e1; /* 中灰色边框 */
+}
+
+.depth-thinking-btn {
+    -fx-background-color: #eff6ff; /* 浅蓝色背景 */
+    -fx-border-color: #dbeafe; /* 蓝色边框 */
+    -fx-text-fill: #3b82f6; /* 蓝色文本 */
+}
+
+.depth-thinking-btn:hover {
+    -fx-background-color: #dbeafe; /* 中蓝色背景 */
+    -fx-border-color: #bfdbfe; /* 深蓝色边框 */
+}
+
+/* Model select button styles */
+.model-select-btn {
+    -fx-background-color: #eff6ff; /* 浅蓝色背景 */
+    -fx-border-color: #dbeafe; /* 蓝色边框 */
+    -fx-text-fill: #1e293b; /* 深色文本 */
+}
+
+.model-select-btn:hover {
+    -fx-background-color: #dbeafe; /* 中蓝色背景 */
+    -fx-border-color: #bfdbfe; /* 深蓝色边框 */
+}
+
+.model-icon {
+    -fx-text-fill: #3b82f6; /* 蓝色文本 */
+}
+
+.model-label {
+    -fx-text-fill: #1e293b; /* 深色文本 */
+    -fx-font-size: 14px;
+}
+
+/* Model arrow button styles */
+.model-arrow-btn {
+    -fx-background-color: #f1f5f9; /* 浅灰色背景 */
+    -fx-border-color: #e2e8f0; /* 浅灰色边框 */
+}
+
+.model-arrow-btn:hover {
+    -fx-background-color: #e2e8f0; /* 中灰色背景 */
+    -fx-border-color: #cbd5e1; /* 中灰色边框 */
+}
+
+/* File upload styles */
+.files-wrap {
+    -fx-background-color: transparent;
+}
+
+.files-list {
+    -fx-background-color: transparent;
+}
+
+.file-row {
+    -fx-padding: 8 12 8 12;
+    -fx-background-color: #f8fafc;
+    -fx-border-color: #e2e8f0;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-spacing: 8;
+}
+
+.file-name {
+    -fx-text-fill: #1e293b;
+    -fx-font-size: 14px;
+}
+
+.file-size {
+    -fx-text-fill: #94a3b8;
+    -fx-font-size: 12px;
+}
+
+.file-remove {
+    -fx-background-color: transparent;
+    -fx-text-fill: #ef4444;
+    -fx-cursor: hand;
+}
+
+.file-remove:hover {
+    -fx-text-fill: #dc2626;
+}
+
+/* File item styles */
+.file-item {
+    -fx-background-color: #f8fafc;
+    -fx-border-color: #e2e8f0;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 12;
+    -fx-spacing: 8;
+}
+
+.file-item:hover {
+    -fx-background-color: #f1f5f9;
+    -fx-border-color: #cbd5e1;
+}
+
+.file-icon {
+    -fx-font-size: 18px; /* 增大图标大小 */
+}
+
+.file-info {
+    -fx-spacing: 4;
+}
+
+.file-name {
+    -fx-text-fill: #1e293b;
+    -fx-font-size: 16px; /* 增大文字大小 */
+}
+
+.file-reupload {
+    -fx-text-fill: #3b82f6;
+    -fx-font-size: 14px; /* 增大文字大小 */
+}
+
+/* Add file button styles */
+.add-file-btn {
+    -fx-background-color: #f8fafc;
+    -fx-border-color: #e2e8f0;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 12;
+    -fx-cursor: hand;
+}
+
+.add-file-btn:hover {
+    -fx-background-color: #f1f5f9;
+    -fx-border-color: #cbd5e1;
+}
+
+.add-file-icon {
+    -fx-font-size: 18px; /* 增大图标大小 */
+    -fx-text-fill: #3b82f6;
+}
+
+/* Response suggestion styles */
+.response-suggestions {
+    -fx-background-color: #ffffff; /* 白色背景 */
+    -fx-border-color: #e2e8f0; /* 浅灰色边框 */
+    -fx-border-width: 1 0 0 0; /* 顶部边框 */
+    -fx-padding: 12;
+}
+
+.suggestion-item {
+    -fx-background-color: #f8fafc; /* 浅色背景 */
+    -fx-border-color: #e2e8f0; /* 浅灰色边框 */
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 10 16;
+    -fx-text-fill: #1e293b; /* 深色文本 */
+    -fx-cursor: hand;
+    -fx-font-size: 14px;
+}
+
+.suggestion-item:hover {
+    -fx-background-color: #f1f5f9; /* 中灰色背景 */
+    -fx-border-color: #cbd5e1; /* 中灰色边框 */
+}
+
+/* Toolbar styles */
+.toolbar {
+    -fx-background-color: #ffffff; /* 白色背景 */
+    -fx-border-color: #e2e8f0; /* 浅灰色边框 */
+    -fx-border-width: 1 0 0 0; /* 顶部边框 */
+    -fx-padding: 8;
+}
+
+.toolbar-btn {
+    -fx-background-color: transparent;
+    -fx-text-fill: #64748b; /* 灰色文本 */
+    -fx-cursor: hand;
+    -fx-padding: 6;
+}
+
+.toolbar-btn:hover {
+    -fx-text-fill: #3b82f6; /* 蓝色文本 */
+}
+
+/* Sidebar styles */
+.sidebar {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #e2e8f0;
+    -fx-border-width: 0 1 0 0;
+    -fx-pref-width: 280;
+    -fx-min-width: 250;
+    -fx-max-width: 350;
+}
+
+.new-session-btn {
+    -fx-background-color: #3b82f6;
+    -fx-text-fill: #ffffff;
+    -fx-border-color: #3b82f6;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 12;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-cursor: hand;
+}
+
+.new-session-btn:hover {
+    -fx-background-color: #2563eb;
+    -fx-border-color: #2563eb;
+}
+
+.session-list {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+
+.session-list .list-cell {
+    -fx-padding: 0;
+    -fx-background-color: transparent;
+}
+
+.session-list .list-cell:selected {
+    -fx-background-color: #eff6ff;
+}
+
+.session-list .list-cell:selected .session-item {
+    -fx-background-color: #dbeafe;
+    -fx-border-color: #3b82f6;
+    -fx-border-width: 2px;
+}
+
+.session-item {
+    -fx-background-color: #f8fafc;
+    -fx-border-color: #e2e8f0;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-cursor: hand;
+}
+
+.session-item:hover {
+    -fx-background-color: #f1f5f9;
+    -fx-border-color: #cbd5e1;
+}
+
+.session-item-selected {
+    -fx-background-color: #dbeafe !important;
+    -fx-border-color: #3b82f6 !important;
+    -fx-border-width: 2px !important;
+}
+
+.session-title {
+    -fx-text-fill: #1e293b;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+}
+
+.session-time {
+    -fx-text-fill: #94a3b8;
+    -fx-font-size: 12px;
+}
+
+.toggle-sidebar-btn {
+    -fx-background-color: #f1f5f9;
+    -fx-border-color: #e2e8f0;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 8 12;
+    -fx-font-size: 16px;
+    -fx-cursor: hand;
+}
+
+.toggle-sidebar-btn:hover {
+    -fx-background-color: #e2e8f0;
+    -fx-border-color: #cbd5e1;
+}
+
+/* Responsive styles */
+@media (max-width: 768px) {
+    .message-bubble {
+        -fx-max-width: 90%;
+    }
+    
+    .composer {
+        -fx-padding: 8;
+    }
+    
+    .input {
+        -fx-font-size: 14px;
+    }
+    
+    .toolsRow {
+        -fx-spacing: 5;
+    }
+    
+    .tool-btn, .icon-btn {
+        -fx-padding: 6 8;
+    }
+    
+    .sidebar {
+        -fx-pref-width: 200;
+        -fx-min-width: 150;
+    }
+}
