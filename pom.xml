@@ -71,7 +71,7 @@
     <build>
         <defaultGoal>clean package</defaultGoal>
         <!--suppress UnresolvedMavenProperty -->
-        <finalName>FileTransport</finalName>
+        <finalName>MyChatAssistant</finalName>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
