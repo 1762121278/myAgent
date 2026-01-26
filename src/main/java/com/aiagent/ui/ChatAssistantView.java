@@ -3,7 +3,10 @@ package com.aiagent.ui;
 import com.aiagent.model.ChatMessage;
 import com.aiagent.model.ChatSession;
 import com.aiagent.model.UploadedFileItem;
-import com.alibaba.fastjson.JSON;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.stream.Collectors;
+import java.util.regex.Pattern;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
@@ -15,6 +18,8 @@ import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.*;
@@ -33,6 +38,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.io.File;
+import com.aiagent.util.SessionStorageManager;
 
 /**
  * 聊天助手视图类，负责显示聊天界面和处理用户交互
@@ -101,12 +107,18 @@ public final class ChatAssistantView extends BorderPane {
     
     /** 当前线程ID */
     private String threadId;
+    
+    /** 会话存储管理器 */
+    private final SessionStorageManager sessionStorageManager;
 
     /**
      * 构造函数，初始化聊天助手视图
      * 构建完整的UI布局：顶部标题栏、侧边栏、聊天区域和输入区域
      */
     public ChatAssistantView() {
+        // 初始化会话存储管理器
+        this.sessionStorageManager = new SessionStorageManager();
+        
         // 设置页面样式类
         getStyleClass().add("page");
         setPrefWidth(DESKTOP_WIDTH);
@@ -138,12 +150,65 @@ public final class ChatAssistantView extends BorderPane {
         setTop(buildHeader());
         setCenter(mainContainer);
 
-        // 初始化：创建初始会话、显示欢迎消息、绑定事件处理
-        createNewSession();
-        seedWelcome(); // 显示欢迎消息
+        // 初始化：加载已保存的会话或创建初始会话、显示欢迎消息、绑定事件处理
+        loadSavedSessions();
+        if (sessions.isEmpty()) {
+            createNewSession();
+            seedWelcome(); // 显示欢迎消息
+        }
         wireBehavior(); // 绑定各种事件处理器
     }
-
+    
+    /**
+     * 格式化时间显示
+     * @param time 时间
+     * @return 格式化后的时间字符串
+     */
+    private static String formatTime(LocalDateTime time) {
+        if (time == null) {
+            return "";
+        }
+        return String.format("%02d:%02d", time.getHour(), time.getMinute());
+    }
+        
+    /**
+     * 加载已保存的会话
+     */
+    private void loadSavedSessions() {
+        List<ChatSession> savedSessions = sessionStorageManager.loadAllSessions();
+        sessions.addAll(savedSessions);
+            
+        // 如果有保存的会话，切换到最新的一个
+        if (!sessions.isEmpty()) {
+            ChatSession latestSession = sessions.get(0); // 按更新时间排序，第一个是最新的
+            switchToSession(latestSession);
+            sessionList.getSelectionModel().select(latestSession);
+        }
+    }
+        
+    /**
+     * 保存当前会话
+     */
+    private void saveCurrentSession() {
+        if (currentSession != null) {
+            sessionStorageManager.saveSession(currentSession);
+        }
+    }
+        
+    /**
+     * 保存所有会话
+     */
+    private void saveAllSessions() {
+        sessionStorageManager.saveSessions(new ArrayList<>(sessions));
+    }
+        
+    /**
+     * 应用程序关闭时保存所有会话
+     */
+    public void saveAllSessionsOnExit() {
+        saveAllSessions();
+    }
+        
     /**
      * 构建顶部标题栏
      * 包含：侧边栏切换按钮、应用图标和标题
@@ -165,8 +230,10 @@ public final class ChatAssistantView extends BorderPane {
         brand.setAlignment(Pos.CENTER_LEFT);
         brand.getStyleClass().add("brand");
 
-        var icon = new Label("🤖");
+        var icon = new ImageView(new Image(getClass().getResourceAsStream("/icons/airobot.jpg")));
         icon.getStyleClass().add("brand-icon");
+        icon.setFitWidth(24);
+        icon.setFitHeight(24);
         var title = new Label("智能对话助手");
         title.getStyleClass().add("brand-title");
 
@@ -289,6 +356,9 @@ public final class ChatAssistantView extends BorderPane {
         sessions.add(newSession);
         switchToSession(newSession);
         sessionList.getSelectionModel().select(newSession);
+        
+        // 保存新会话到本地
+        saveCurrentSession();
     }
     
     /**
@@ -310,6 +380,9 @@ public final class ChatAssistantView extends BorderPane {
             }
             currentSession.setMessages(realMessages);
             currentSession.setUploadedFiles(new ArrayList<>(uploadedFiles));
+            
+            // 保存当前会话到本地
+            saveCurrentSession();
         }
         
         // 切换到新会话
@@ -747,6 +820,9 @@ public final class ChatAssistantView extends BorderPane {
                     // 恢复发送按钮状态
                     sendBtn.setText(originalText);
                     sendBtn.setDisable(false);
+                    
+                    // 保存会话到本地
+                    saveCurrentSession();
                 });
             } catch (Exception e) {
                 // 捕获异常并显示错误消息
@@ -764,6 +840,9 @@ public final class ChatAssistantView extends BorderPane {
                     // 恢复发送按钮状态
                     sendBtn.setText(originalText);
                     sendBtn.setDisable(false);
+                    
+                    // 保存会话到本地
+                    saveCurrentSession();
                 });
             }
         }).start();
@@ -794,7 +873,7 @@ public final class ChatAssistantView extends BorderPane {
 
             // 发送请求体到服务器
             try (java.io.OutputStream os = connection.getOutputStream()) {
-                byte[] input = JSON.toJSONString(queryMap).getBytes(StandardCharsets.UTF_8);
+                byte[] input = createJsonString(queryMap).getBytes(StandardCharsets.UTF_8);
                 os.write(input, 0, input.length);
             }
 
@@ -826,6 +905,38 @@ public final class ChatAssistantView extends BorderPane {
             log.error(e.getMessage(),e);
             return "抱歉，调用AI接口时发生错误：" + e.getMessage();
         }
+    }
+
+    /**
+     * 创建JSON字符串
+     * 将Map转换为JSON格式的字符串
+     * 
+     * @param map 要转换的Map对象
+     * @return JSON格式的字符串
+     */
+    private String createJsonString(Map<String, Object> map) {
+        StringBuilder json = new StringBuilder();
+        json.append("{");
+        
+        boolean first = true;
+        for (Map.Entry<String, Object> entry : map.entrySet()) {
+            if (!first) {
+                json.append(",");
+            }
+            json.append("\"").append(escapeJson(entry.getKey())).append("\":");
+            
+            Object value = entry.getValue();
+            if (value instanceof String) {
+                json.append("\"").append(escapeJson((String) value)).append("\"");
+            } else {
+                json.append(value.toString());
+            }
+            
+            first = false;
+        }
+        
+        json.append("}");
+        return json.toString();
     }
 
     /**
@@ -1036,13 +1147,70 @@ public final class ChatAssistantView extends BorderPane {
             VBox markdownContent = MarkdownRenderer.render(item.getText(), 16, textColor);
             markdownContent.setMaxWidth(600); // 设置最大宽度，防止消息气泡过宽
             markdownContent.getStyleClass().add("bubble-content");
+            
+            // 创建时间标签
+            Label timeLabel = new Label(formatTime(item.getCreatedAt()));
+            timeLabel.getStyleClass().add("message-time");
+            timeLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #94a3b8; -fx-opacity: 0.8;");
+            
+            // 将时间标签放在内容下方
+            VBox messageWithTime = new VBox(markdownContent, timeLabel);
+            messageWithTime.setMaxWidth(600);
+            messageWithTime.getStyleClass().add("bubble-content");
+            
+            VBox finalMarkdownContent = messageWithTime;
 
+            // 创建复制按钮
+            Button copyButton = new Button();
+            copyButton.setGraphic(new Text("📋"));
+            copyButton.getStyleClass().add("copy-button");
+            copyButton.setTooltip(new Tooltip("复制此消息"));
+            copyButton.setOnAction(e -> {
+                Clipboard clipboard = Clipboard.getSystemClipboard();
+                ClipboardContent content = new ClipboardContent();
+                content.putString(item.getText());
+                clipboard.setContent(content);
+                            
+                // 临时改变按钮外观以提供视觉反馈
+                String originalText = copyButton.getText();
+                copyButton.setText("✓");
+                copyButton.setTooltip(new Tooltip("已复制"));
+                            
+                // 1秒后恢复原始图标
+                new Timeline(new KeyFrame(Duration.seconds(1), ev -> {
+                    copyButton.setGraphic(new Text("📋"));
+                    copyButton.setText("");
+                    copyButton.setTooltip(new Tooltip("复制此消息"));
+                })).play();
+            });
+                        
+            // 设置复制按钮的最小尺寸和样式
+            copyButton.setMinSize(24, 24);
+            copyButton.setMaxSize(24, 24);
+            copyButton.setStyle("-fx-background-color: transparent; -fx-cursor: hand;" +
+                              "-fx-text-fill: #999; -fx-font-size: 14px; -fx-padding: 0;" +
+                              "-fx-border-color: transparent; -fx-alignment: center;");
+            
             // 创建消息气泡容器（VBox用于垂直布局，支持代码块等块级元素）
             var bubble = new VBox();
             bubble.getStyleClass().add("bubble");
-            bubble.getChildren().add(markdownContent);
+            bubble.getChildren().add(finalMarkdownContent);
             bubble.setMaxWidth(600);
-
+            
+            // 创建消息内容和复制按钮的容器
+            var contentWithCopy = new HBox();
+            if (item.getRole() == ChatMessage.Role.USER) {
+                // 用户消息：复制按钮在左侧
+                contentWithCopy.getChildren().addAll(copyButton, bubble);
+                contentWithCopy.setAlignment(Pos.CENTER_RIGHT);
+            } else {
+                // AI消息：复制按钮在右侧
+                contentWithCopy.getChildren().addAll(bubble, copyButton);
+                contentWithCopy.setAlignment(Pos.CENTER_LEFT);
+            }
+                        
+            contentWithCopy.getStyleClass().add("message-content-wrapper");
+            
             // 创建消息行容器（HBox用于水平布局，控制消息对齐方式）
             var row = new HBox();
             row.getStyleClass().add("bubble-row");
@@ -1052,16 +1220,16 @@ public final class ChatAssistantView extends BorderPane {
                     // 气泡最大宽度为父容器宽度的 90%，留出边距
                     double maxWidth = newWidth.doubleValue() * 0.9;
                     bubble.setMaxWidth(maxWidth);
-                    markdownContent.setMaxWidth(maxWidth - 24); // 减去气泡的padding（左右各12px）
+                    finalMarkdownContent.setMaxWidth(maxWidth - 24); // 减去气泡的padding（左右各12px）
                     // 更新代码块的最大宽度（代码块需要额外的边距）
-                    markdownContent.getChildren().forEach(child -> {
+                    finalMarkdownContent.getChildren().forEach(child -> {
                         if (child instanceof Region && child.getStyleClass().contains("code-block")) {
-                            ((Region) child).setMaxWidth(maxWidth - 48); // 减去更多的边距
+                            ((Region) child).setMaxWidth(maxWidth - 48); // 减少更多的边距
                         }
                     });
                 }
             });
-
+            
             if (item.getRole() == ChatMessage.Role.USER) {
                 row.setAlignment(Pos.TOP_RIGHT);
                 bubble.getStyleClass().add("bubble-user");
@@ -1069,14 +1237,14 @@ public final class ChatAssistantView extends BorderPane {
                 row.setAlignment(Pos.TOP_LEFT);
                 bubble.getStyleClass().add("bubble-ai");
             }
-
-            row.getChildren().add(bubble);
-
+        
+            row.getChildren().add(contentWithCopy);
+        
             setText(null);
             setGraphic(row);
         }
     }
-
+        
     /**
      * 文件项单元格类，用于显示上传的文件
      */
@@ -1142,7 +1310,7 @@ public final class ChatAssistantView extends BorderPane {
             }
 
             titleLabel.setText(session.getTitle());
-            timeLabel.setText(formatTime(session.getUpdatedAt()));
+            timeLabel.setText(ChatAssistantView.formatTime(session.getUpdatedAt()));
             
             // 根据选中状态更新样式
             if (isSelected()) {
@@ -1157,23 +1325,6 @@ public final class ChatAssistantView extends BorderPane {
             
             setText(null);
             setGraphic(container);
-        }
-        
-        private String formatTime(LocalDateTime time) {
-            if (time == null) {
-                return "";
-            }
-            LocalDateTime now = LocalDateTime.now();
-            if (time.toLocalDate().equals(now.toLocalDate())) {
-                // 今天：显示时间
-                return String.format("%02d:%02d", time.getHour(), time.getMinute());
-            } else if (time.toLocalDate().equals(now.toLocalDate().minusDays(1))) {
-                // 昨天
-                return "昨天";
-            } else {
-                // 更早：显示日期
-                return String.format("%d/%d", time.getMonthValue(), time.getDayOfMonth());
-            }
         }
     }
 }

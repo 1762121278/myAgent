@@ -6,12 +6,14 @@ set PATH=%JAVA_HOME%\bin;%PATH%
 set M2_HOME=C:\Users\wangfengzhang\.m2\repository
 set JAVAFX_VERSION=21.0.5
 set SLF4J_VERSION=1.7.36
+set FASTJSON_VERSION=2.0.43
 set JAVAFX_PATH=%M2_HOME%\org\openjfx\javafx-base\%JAVAFX_VERSION%\javafx-base-%JAVAFX_VERSION%.jar;%M2_HOME%\org\openjfx\javafx-base\%JAVAFX_VERSION%\javafx-base-%JAVAFX_VERSION%-win.jar;%M2_HOME%\org\openjfx\javafx-graphics\%JAVAFX_VERSION%\javafx-graphics-%JAVAFX_VERSION%.jar;%M2_HOME%\org\openjfx\javafx-graphics\%JAVAFX_VERSION%\javafx-graphics-%JAVAFX_VERSION%-win.jar;%M2_HOME%\org\openjfx\javafx-controls\%JAVAFX_VERSION%\javafx-controls-%JAVAFX_VERSION%.jar;%M2_HOME%\org\openjfx\javafx-controls\%JAVAFX_VERSION%\javafx-controls-%JAVAFX_VERSION%-win.jar
 set SLF4J_PATH=%M2_HOME%\org\slf4j\slf4j-api\%SLF4J_VERSION%\slf4j-api-%SLF4J_VERSION%.jar;%M2_HOME%\org\slf4j\slf4j-simple\%SLF4J_VERSION%\slf4j-simple-%SLF4J_VERSION%.jar
-set CLASSPATH=%JAVAFX_PATH%;%SLF4J_PATH%
+set FASTJSON_PATH=%M2_HOME%\com\alibaba\fastjson2\%FASTJSON_VERSION%\fastjson2-%FASTJSON_VERSION%.jar
+set CLASSPATH=%JAVAFX_PATH%;%SLF4J_PATH%;%FASTJSON_PATH%
 
 echo Compiling with JDK 21...
-javac -d target\classes -cp "%CLASSPATH%" src\main\java\com\aiagent\app\ChatAssistantApp.java src\main\java\com\aiagent\model\*.java src\main\java\com\aiagent\ui\*.java
+javac -d target\classes -cp "%CLASSPATH%;." -sourcepath src\main\java src\main\java\com\aiagent\app\*.java src\main\java\com\aiagent\model\*.java src\main\java\com\aiagent\ui\*.java src\main\java\com\aiagent\util\*.java src\main\java\com\aiagent\config\*.java src\main\java\com\aiagent\controller\*.java src\main\java\com\aiagent\functioncall\*.java src\main\java\com\aiagent\outputSchema\*.java
 
 if %errorlevel% equ 0 (
     echo Compilation successful!
