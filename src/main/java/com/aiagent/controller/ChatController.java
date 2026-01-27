@@ -1,10 +1,13 @@
 package com.aiagent.controller;
 
 
+import com.alibaba.cloud.ai.graph.NodeOutput;
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.RunnableConfig;
 import com.alibaba.cloud.ai.graph.agent.ReactAgent;
 import com.alibaba.cloud.ai.graph.exception.GraphRunnerException;
+import com.alibaba.cloud.ai.graph.streaming.OutputType;
+import com.alibaba.cloud.ai.graph.streaming.StreamingOutput;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import org.slf4j.Logger;
@@ -12,12 +15,15 @@ import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -46,6 +52,38 @@ public class ChatController {
         AssistantMessage response = chatBotAgent.call(input,runnableConfig);
         log.info(response.toString());
         return response.getText();
+    }
+
+    @RequestMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<String> stream(@RequestBody String queryJson) throws GraphRunnerException {
+        // ... 你的现有逻辑 ...
+        log.info("query:{}", queryJson);
+        JSONObject queryMap = JSON.parseObject(queryJson);
+        String input = queryMap.getString("query");
+        //同一个会话ID，用于关联上下文会话
+        String threadId = queryMap.getString("threadId");
+        RunnableConfig runnableConfig = RunnableConfig.builder().threadId(threadId).build();
+        Flux<NodeOutput> stream = chatBotAgent.stream(input,runnableConfig);
+        return Flux.create(sink -> {
+            stream.subscribe(
+                    output -> {
+                        if (output instanceof StreamingOutput streamingOutput) {
+                            if (streamingOutput.getOutputType() == OutputType.AGENT_MODEL_STREAMING) {
+                                // 发送 JSON 格式的流式数据
+                                sink.next(JSON.toJSONString(Map.of(
+                                        "type", "chunk",
+                                        "content",streamingOutput.message().getText()
+                                )));
+                            }
+                        }
+                    },
+                    sink::error,
+                    () -> {
+                        sink.next(JSON.toJSONString(Map.of("type", "end")));
+                        sink.complete();
+                    }
+            );
+        });
     }
 
     @RequestMapping("/chatStream")
