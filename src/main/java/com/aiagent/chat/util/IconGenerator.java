@@ -1,4 +1,4 @@
-package com.aiagent.util;
+package com.aiagent.chat.util;
 
 import javafx.scene.image.PixelWriter;
 import javafx.scene.image.WritableImage;

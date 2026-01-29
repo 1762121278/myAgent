@@ -1,7 +1,7 @@
 package com.aiagent.config;
 
 
-import com.aiagent.outputSchema.TextAnalysisResult;
+import com.aiagent.chat.outputSchema.TextAnalysisResult;
 import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions;
 import com.alibaba.cloud.ai.graph.agent.ReactAgent;
 import com.alibaba.cloud.ai.graph.checkpoint.savers.MemorySaver;

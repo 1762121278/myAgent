@@ -1,4 +1,4 @@
-package com.aiagent.ui;
+package com.aiagent.chat.ui;
 
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
@@ -14,10 +14,12 @@ import java.util.regex.Pattern;
 /**
  * Markdown渲染器，用于将Markdown文本转换为JavaFX节点
  * 支持代码块、行内代码、粗体、斜体等格式
+ * @author jiangtao.shu
  */
 public class MarkdownRenderer {
-    
-    // 代码块模式：支持语言标识符，如 ```java 或 ```python
+    /**
+     *     代码块模式：支持语言标识符，如 ```java 或 ```python
+     */
     private static final Pattern CODE_BLOCK_PATTERN = Pattern.compile("```(?:\\w+)?\\n?([\\s\\S]*?)```", Pattern.MULTILINE);
     private static final Pattern INLINE_CODE_PATTERN = Pattern.compile("`([^`]+)`");
     private static final Pattern BOLD_PATTERN = Pattern.compile("\\*\\*(.+?)\\*\\*");

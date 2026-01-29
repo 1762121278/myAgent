@@ -1,4 +1,4 @@
-package com.aiagent.model;
+package com.aiagent.chat.model;
 
 import java.time.LocalDateTime;
 import java.util.Objects;

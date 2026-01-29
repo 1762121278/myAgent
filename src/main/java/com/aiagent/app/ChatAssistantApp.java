@@ -1,7 +1,7 @@
 package com.aiagent.app;
 
-import com.aiagent.ui.ChatAssistantView;
-import com.aiagent.util.SimpleIconGenerator;
+import com.aiagent.chat.ui.ChatAssistantView;
+import com.aiagent.chat.util.SimpleIconGenerator;
 import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.scene.image.Image;
@@ -11,6 +11,9 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Objects;
 
+/**
+ * @author jiangtao.shu
+ */
 public class ChatAssistantApp extends Application {
     private static final Logger log = LoggerFactory.getLogger(ChatAssistantApp.class);
 

@@ -1,5 +1,6 @@
 package com.aiagent.app;
 
+import lombok.Getter;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.ConfigurableApplicationContext;
@@ -10,6 +11,12 @@ import org.springframework.context.ConfigurableApplicationContext;
  */
 @SpringBootApplication(scanBasePackages = "com.aiagent")
 public class SpringBootApp {
+    /**
+     * -- GETTER --
+     *  获取 Spring 上下文
+     *
+     */
+    @Getter
     private static ConfigurableApplicationContext context;
     
     /**
@@ -18,14 +25,6 @@ public class SpringBootApp {
      */
     public static void start(String[] args) {
         context = SpringApplication.run(SpringBootApp.class, args);
-    }
-    
-    /**
-     * 获取 Spring 上下文
-     * @return 配置好的 Spring 上下文
-     */
-    public static ConfigurableApplicationContext getContext() {
-        return context;
     }
     
     /**

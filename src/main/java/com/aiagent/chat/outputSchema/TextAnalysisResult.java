@@ -1,4 +1,4 @@
-package com.aiagent.outputSchema;
+package com.aiagent.chat.outputSchema;
 
 import lombok.Data;
 

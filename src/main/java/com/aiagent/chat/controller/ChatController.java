@@ -1,4 +1,4 @@
-package com.aiagent.controller;
+package com.aiagent.chat.controller;
 
 
 import com.alibaba.cloud.ai.graph.NodeOutput;

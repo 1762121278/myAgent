@@ -1,12 +1,13 @@
-package com.aiagent.ui;
+package com.aiagent.chat.ui;
 
-import com.aiagent.model.ChatMessage;
-import com.aiagent.model.ChatSession;
-import com.aiagent.model.UploadedFileItem;
-import com.aiagent.util.SessionStorageManager;
-import javafx.animation.KeyFrame;
-import javafx.animation.KeyValue;
-import javafx.animation.Timeline;
+import com.aiagent.chat.model.ChatMessage;
+import com.aiagent.chat.model.ChatSession;
+import com.aiagent.chat.model.UploadedFileItem;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import com.aiagent.chat.util.SessionStorageManager;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
@@ -25,30 +26,37 @@ import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.*;
 import javafx.scene.text.Text;
 import javafx.stage.FileChooser;
+import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
+import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonType;
+import javafx.animation.Timeline;
 import javafx.util.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.io.File;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * 聊天助手视图类，负责显示聊天界面和处理用户交互
- * 
+ *
  * 主要功能：
  * - 显示聊天消息列表，支持Markdown格式渲染
  * - 管理多个会话，支持会话切换
  * - 文件上传功能（文档和图片）
  * - 侧边栏显示/隐藏，带滑动动画效果
  * - 与后端AI接口通信，获取智能回复
- * 
+ *
  * @author jiangtao.shu
  */
-public final class ChatAssistantViewResult extends BorderPane {
+public final class ChatAssistantView extends BorderPane {
     /** 桌面版宽度 - 用于设置界面默认宽度 */
     private static final double DESKTOP_WIDTH = 1400;
     /** 移动版断点宽度 - 小于此宽度时应用移动端样式 */
@@ -63,7 +71,7 @@ public final class ChatAssistantViewResult extends BorderPane {
     private static final Set<String> DOC_EXT = Set.of("pdf", "doc", "docx", "txt");
     /** 支持的图片扩展名 */
     private static final Set<String> IMG_EXT = Set.of("jpg", "jpeg", "png");
-    private static final Logger log = LoggerFactory.getLogger(ChatAssistantViewResult.class);
+    private static final Logger log = LoggerFactory.getLogger(ChatAssistantView.class);
 
     /** 聊天消息列表 */
     private final ObservableList<ChatMessage> messages = FXCollections.observableArrayList();
@@ -113,14 +121,17 @@ public final class ChatAssistantViewResult extends BorderPane {
     /** 待处理的错误信息映射表，key为sessionId，value为错误信息 */
     private final Map<String, String> pendingErrors = new HashMap<>();
 
+    /** 是否使用流式API，默认为true */
+    private boolean useStreamingApi = true;
+
     /**
      * 构造函数，初始化聊天助手视图
      * 构建完整的UI布局：顶部标题栏、侧边栏、聊天区域和输入区域
      */
-    public ChatAssistantViewResult() {
+    public ChatAssistantView() {
         // 初始化会话存储管理器
         this.sessionStorageManager = new SessionStorageManager();
-        
+
         // 设置页面样式类
         getStyleClass().add("page");
         setPrefWidth(DESKTOP_WIDTH);
@@ -129,25 +140,25 @@ public final class ChatAssistantViewResult extends BorderPane {
         var mainContent = new VBox();
         mainContent.setFillWidth(true);
         mainContent.setSpacing(0); // 移除间距，实现无缝衔接
-        
+
         // 构建聊天区域（历史消息显示区域）
         var chatArea = buildChatArea();
         VBox.setVgrow(chatArea, Priority.ALWAYS); // 让聊天区域占据所有可用空间
-        
+
         // 构建输入区域（包含输入框和工具栏）
         var inputArea = buildInputArea();
-        
+
         // 将聊天区域和输入区域添加到主内容区域
         mainContent.getChildren().addAll(chatArea, inputArea);
 
         // 构建侧边栏（会话列表）
         buildSidebar();
-        
+
         // 创建主布局容器（包含侧边栏和主内容）
         var mainContainer = new HBox();
         mainContainer.getChildren().addAll(sidebar, mainContent);
         HBox.setHgrow(mainContent, Priority.ALWAYS); // 主内容区域自动扩展
-        
+
         // 设置顶部标题栏和中心内容区域
         setTop(buildHeader());
         setCenter(mainContainer);
@@ -160,7 +171,7 @@ public final class ChatAssistantViewResult extends BorderPane {
         }
         wireBehavior(); // 绑定各种事件处理器
     }
-    
+
     /**
      * 格式化时间显示
      * @param time 时间
@@ -172,14 +183,14 @@ public final class ChatAssistantViewResult extends BorderPane {
         }
         return String.format("%02d:%02d", time.getHour(), time.getMinute());
     }
-        
+
     /**
      * 加载已保存的会话
      */
     private void loadSavedSessions() {
         List<ChatSession> savedSessions = sessionStorageManager.loadAllSessions();
         sessions.addAll(savedSessions);
-            
+
         // 如果有保存的会话，切换到最新的一个
         if (!sessions.isEmpty()) {
             ChatSession latestSession = sessions.get(0); // 按更新时间排序，第一个是最新的
@@ -187,7 +198,7 @@ public final class ChatAssistantViewResult extends BorderPane {
             sessionList.getSelectionModel().select(latestSession);
         }
     }
-        
+
     /**
      * 保存当前会话
      */
@@ -196,25 +207,25 @@ public final class ChatAssistantViewResult extends BorderPane {
             sessionStorageManager.saveSession(currentSession);
         }
     }
-        
+
     /**
      * 保存所有会话
      */
     private void saveAllSessions() {
         sessionStorageManager.saveSessions(new ArrayList<>(sessions));
     }
-        
+
     /**
      * 应用程序关闭时保存所有会话
      */
     public void saveAllSessionsOnExit() {
         saveAllSessions();
     }
-        
+
     /**
      * 构建顶部标题栏
      * 包含：侧边栏切换按钮、应用图标和标题
-     * 
+     *
      * @return 标题栏节点（HBox容器）
      */
     private Node buildHeader() {
@@ -244,7 +255,7 @@ public final class ChatAssistantViewResult extends BorderPane {
         header.getChildren().addAll(toggleSidebarBtn, brand);
         return header;
     }
-    
+
     /**
      * 构建侧边栏
      * 包含：新建会话按钮和会话列表
@@ -259,26 +270,26 @@ public final class ChatAssistantViewResult extends BorderPane {
         sidebar.setSpacing(12);
         // 初始化时侧边栏可见，translateX为0
         sidebar.setTranslateX(0);
-        
+
         // 新建会话按钮
         newSessionBtn.getStyleClass().add("new-session-btn");
         newSessionBtn.setMaxWidth(Double.MAX_VALUE);
         newSessionBtn.setOnAction(e -> createNewSession());
-        
+
         // 会话列表
         sessionList.setItems(sessions);
         sessionList.getStyleClass().add("session-list");
-        sessionList.setCellFactory(v -> new SessionCell());
+        sessionList.setCellFactory(v -> new SessionCell(this));
         sessionList.setPrefHeight(Region.USE_COMPUTED_SIZE);
         VBox.setVgrow(sessionList, Priority.ALWAYS);
-        
+
         // 会话列表选择监听
         sessionList.getSelectionModel().selectedItemProperty().addListener((obs, oldSession, newSession) -> {
             if (newSession != null) {
                 switchToSession(newSession);
             }
         });
-        
+
         // 添加鼠标点击事件，确保点击会话项时能切换
         sessionList.setOnMouseClicked(e -> {
             ChatSession selected = sessionList.getSelectionModel().getSelectedItem();
@@ -286,17 +297,17 @@ public final class ChatAssistantViewResult extends BorderPane {
                 switchToSession(selected);
             }
         });
-        
+
         // 监听会话列表变化，刷新显示
         sessions.addListener((ListChangeListener<ChatSession>) c -> {
             Platform.runLater(() -> {
                 sessionList.refresh();
             });
         });
-        
+
         sidebar.getChildren().addAll(newSessionBtn, sessionList);
     }
-    
+
     /**
      * 切换侧边栏显示/隐藏（带滑动动画）
      * 使用Timeline动画实现平滑的宽度变化效果，提升用户体验
@@ -304,17 +315,17 @@ public final class ChatAssistantViewResult extends BorderPane {
     private void toggleSidebar() {
         sidebarVisible = !sidebarVisible;
         double targetWidth = 280; // 侧边栏目标宽度
-        
+
         if (sidebarVisible) {
             // 显示侧边栏：从宽度0滑入到目标宽度（400毫秒动画）
             sidebar.setVisible(true);
             sidebar.setManaged(true);
             sidebar.setPrefWidth(0); // 初始宽度为0
             sidebar.setMinWidth(0);
-            
+
             // 创建滑入动画：宽度从0增加到目标宽度
             Timeline slideIn = new Timeline(
-                new KeyFrame(Duration.ZERO, 
+                new KeyFrame(Duration.ZERO,
                     new KeyValue(sidebar.prefWidthProperty(), 0),
                     new KeyValue(sidebar.minWidthProperty(), 0)),
                 new KeyFrame(Duration.millis(400), // 动画时长400毫秒
@@ -326,10 +337,10 @@ public final class ChatAssistantViewResult extends BorderPane {
         } else {
             // 隐藏侧边栏：从当前宽度滑出到0（400毫秒动画）
             double currentWidth = sidebar.getWidth() > 0 ? sidebar.getWidth() : targetWidth;
-            
+
             // 创建滑出动画：宽度从当前宽度减少到0
             Timeline slideOut = new Timeline(
-                new KeyFrame(Duration.ZERO, 
+                new KeyFrame(Duration.ZERO,
                     new KeyValue(sidebar.prefWidthProperty(), currentWidth),
                     new KeyValue(sidebar.minWidthProperty(), 250)),
                 new KeyFrame(Duration.millis(400), // 动画时长400毫秒
@@ -348,7 +359,7 @@ public final class ChatAssistantViewResult extends BorderPane {
             slideOut.play();
         }
     }
-    
+
     /**
      * 创建新会话
      * 创建一个新的ChatSession对象，添加到会话列表，并切换到该会话
@@ -358,15 +369,15 @@ public final class ChatAssistantViewResult extends BorderPane {
         sessions.add(newSession);
         switchToSession(newSession);
         sessionList.getSelectionModel().select(newSession);
-        
+
         // 保存新会话到本地
         saveCurrentSession();
     }
-    
+
     /**
      * 切换到指定会话
      * 保存当前会话状态，加载目标会话的消息和文件列表
-     * 
+     *
      * @param session 要切换到的会话对象
      */
     private void switchToSession(ChatSession session) {
@@ -382,15 +393,15 @@ public final class ChatAssistantViewResult extends BorderPane {
             }
             currentSession.setMessages(realMessages);
             currentSession.setUploadedFiles(new ArrayList<>(uploadedFiles));
-            
+
             // 保存当前会话到本地
             saveCurrentSession();
         }
-        
+
         // 切换到新会话
         currentSession = session;
         threadId = session.getId();
-        
+
         // 更新消息列表
         messages.clear();
         List<ChatMessage> sessionMessages = session.getMessages();
@@ -401,7 +412,7 @@ public final class ChatAssistantViewResult extends BorderPane {
             // 如果会话有消息，直接显示会话消息
             messages.addAll(sessionMessages);
         }
-        
+
         // 检查是否存在待处理的响应，并添加到当前会话
         String sessionId = session.getId();
         if (pendingResponses.containsKey(sessionId)) {
@@ -417,7 +428,7 @@ public final class ChatAssistantViewResult extends BorderPane {
                 pendingResponses.remove(sessionId);
             }
         }
-        
+
         // 检查是否存在待处理的错误，并添加到当前会话
         if (pendingErrors.containsKey(sessionId)) {
             String error = pendingErrors.get(sessionId);
@@ -432,19 +443,19 @@ public final class ChatAssistantViewResult extends BorderPane {
                 pendingErrors.remove(sessionId);
             }
         }
-        
+
         // 更新文件列表
         uploadedFiles.clear();
         uploadedFiles.addAll(session.getUploadedFiles());
-        
+
         // 滚动到底部
         Platform.runLater(this::scrollToBottom);
     }
-    
+
     /**
      * 判断是否是欢迎消息
      * 欢迎消息是AI发送的初始提示消息，不应保存到会话历史中
-     * 
+     *
      * @param message 消息对象
      * @return 如果是欢迎消息返回true，否则返回false
      */
@@ -459,7 +470,7 @@ public final class ChatAssistantViewResult extends BorderPane {
     /**
      * 构建聊天区域
      * 包含消息列表和滚动容器，用于显示聊天历史
-     * 
+     *
      * @return 聊天区域节点（StackPane容器）
      */
     private Node buildChatArea() {
@@ -490,7 +501,7 @@ public final class ChatAssistantViewResult extends BorderPane {
     /**
      * 构建输入区域
      * 包含：文件上传区域、文本输入框、工具栏（模型选择、附件、发送等按钮）
-     * 
+     *
      * @return 输入区域节点（VBox容器）
      */
     private Node buildInputArea() {
@@ -586,7 +597,19 @@ public final class ChatAssistantViewResult extends BorderPane {
         sendBtn.setDefaultButton(true);
         sendBtn.setDisable(true);
 
-        toolsRow.getChildren().addAll(depthThinkingBtn, modelSelectBtn, modelArrowBtn, micBtn, attachBtn, imageBtn, sendBtn);
+        // 创建API模式切换按钮
+        var apiModeToggleBtn = new Button();
+        apiModeToggleBtn.getStyleClass().addAll("icon-btn", "api-mode-toggle-btn");
+        apiModeToggleBtn.setTooltip(new Tooltip("切换API模式：流式/同步"));
+        // 根据当前模式设置按钮图标
+        updateApiModeButton(apiModeToggleBtn);
+        apiModeToggleBtn.setOnAction(e -> {
+            // 切换API模式
+            useStreamingApi = !useStreamingApi;
+            updateApiModeButton(apiModeToggleBtn);
+        });
+
+        toolsRow.getChildren().addAll(depthThinkingBtn, modelSelectBtn, modelArrowBtn, micBtn, attachBtn, imageBtn, apiModeToggleBtn, sendBtn);
 
         wrap.getChildren().addAll(filesContainer, input, toolsRow);
         return wrap;
@@ -595,41 +618,41 @@ public final class ChatAssistantViewResult extends BorderPane {
     /**
      * 创建文件项组件
      * 显示文件图标、文件名、重新上传提示和删除按钮
-     * 
+     *
      * @param file 上传的文件项对象
      * @return 文件项组件（HBox容器）
      */
     private HBox createFileItem(UploadedFileItem file) {
         var fileItem = new HBox(8);
         fileItem.getStyleClass().add("file-item");
-        
+
         var fileIcon = new Label("📄");
         fileIcon.getStyleClass().add("file-icon");
-        
+
         var fileInfo = new VBox(4);
         fileInfo.getStyleClass().add("file-info");
-        
+
         var fileName = new Label(file.getName());
         fileName.getStyleClass().add("file-name");
-        
+
         var fileReupload = new Label("点击图标重新上传");
         fileReupload.getStyleClass().add("file-reupload");
-        
+
         fileInfo.getChildren().addAll(fileName, fileReupload);
-        
+
         // 添加删除文件按钮
         var removeBtn = new Button("×");
         removeBtn.getStyleClass().add("file-remove-btn");
         removeBtn.setTooltip(new Tooltip("删除文件"));
         removeBtn.setOnAction(e -> uploadedFiles.remove(file));
-        
+
         // 添加点击重新上传功能
         fileItem.setOnMouseClicked(e -> {
             if (!e.getTarget().equals(removeBtn)) {
                 chooseFiles(false);
             }
         });
-        
+
         fileItem.getChildren().addAll(fileIcon, fileInfo, removeBtn);
         return fileItem;
     }
@@ -692,7 +715,7 @@ public final class ChatAssistantViewResult extends BorderPane {
     /**
      * 应用响应式布局
      * 根据窗口宽度调整UI布局，小于768px时应用移动端样式
-     * 
+     *
      * @param width 当前窗口宽度
      */
     private void applyResponsive(double width) {
@@ -732,7 +755,7 @@ public final class ChatAssistantViewResult extends BorderPane {
     /**
      * 选择文件
      * 打开文件选择对话框，允许用户选择一个或多个文件
-     * 
+     *
      * @param imagesOnly 如果为true，只允许选择图片文件；如果为false，可以选择文档或图片
      */
     private void chooseFiles(boolean imagesOnly) {
@@ -764,7 +787,7 @@ public final class ChatAssistantViewResult extends BorderPane {
     /**
      * 验证并添加文件
      * 检查文件格式、大小和是否重复，验证通过后添加到上传文件列表
-     * 
+     *
      * @param file 要添加的文件对象
      * @return 如果文件验证通过并成功添加返回true，否则返回false
      */
@@ -811,7 +834,8 @@ public final class ChatAssistantViewResult extends BorderPane {
 
         // 获取用户输入的文本和上传的文件
         String text = input.getText() == null ? "" : input.getText().trim();
-        var filesSnapshot = List.copyOf(uploadedFiles); // 创建文件列表的快照
+        // 创建文件列表的快照
+        var filesSnapshot = List.copyOf(uploadedFiles);
 
         // 移除欢迎消息（如果存在），因为用户已经开始对话
         messages.removeIf(this::isWelcomeMessage);
@@ -820,115 +844,133 @@ public final class ChatAssistantViewResult extends BorderPane {
         ChatMessage userMessage = new ChatMessage(ChatMessage.Role.USER, buildUserPayload(text, filesSnapshot), LocalDateTime.now());
         messages.add(userMessage);
         currentSession.addMessage(userMessage);
-        
+
         // 清空输入框和文件列表，准备下一次输入
         input.clear();
         uploadedFiles.clear();
-        
+
         // 添加加载中的消息，提示用户AI正在处理
         ChatMessage loadingMessage = new ChatMessage(ChatMessage.Role.AI, "loading", LocalDateTime.now());
         messages.add(loadingMessage);
-        
+
         // 禁用发送按钮并更改文本为"处理中..."，防止重复发送
         sendBtn.setDisable(true);
         String originalText = sendBtn.getText();
         sendBtn.setText("处理中...");
-        
+
         // 保存当前会话的引用，用于后续验证
         ChatSession activeSession = currentSession;
         String activeThreadId = threadId;
-        String activeSessionId = currentSession.getId(); // 保存会话ID
+        // 保存会话ID
+        String activeSessionId = currentSession.getId();
 
-        // 在后台线程中异步调用AI接口（避免阻塞UI线程）
-        new Thread(() -> {
-            try {
-                // 调用AI接口获取回复
-                String aiResponse = callAiApi(text, activeThreadId);
-                // 在JavaFX应用线程中更新UI（必须在UI线程中操作JavaFX组件）
-                Platform.runLater(() -> {
-                    // 检查当前会话是否仍是发起请求时的会话
-                    if (currentSession == activeSession && threadId.equals(activeThreadId)) {
-                        // 移除加载中的消息
-                        messages.remove(loadingMessage);
-                        // 添加AI回复（确保响应文本不为null）
-                        String responseText = aiResponse != null ? aiResponse : "抱歉，未收到有效响应。";
-                        ChatMessage aiMessage = new ChatMessage(ChatMessage.Role.AI, responseText, LocalDateTime.now());
-                        messages.add(aiMessage);
-                        currentSession.addMessage(aiMessage); // 保存到会话历史
-                        // 刷新会话列表以更新标题（会话标题可能基于第一条消息生成）
-                        sessionList.refresh();
-                        // 恢复发送按钮状态
-                        sendBtn.setText(originalText);
-                        sendBtn.setDisable(false);
-                        
-                        // 保存会话到本地
-                        saveCurrentSession();
-                    } else {
-                        // 如果当前会话已改变，将响应暂存到对应的会话ID
-                        messages.remove(loadingMessage);
-                        
-                        // 恢复发送按钮状态
-                        sendBtn.setText(originalText);
-                        sendBtn.setDisable(false);
-                        
-                        // 保存当前会话
-                        saveCurrentSession();
-                        
-                        // 将响应暂存到对应的会话ID
-                        if (aiResponse != null) {
-                            pendingResponses.put(activeSessionId, aiResponse);
+        // 根据配置决定使用哪种API方式
+        if (useStreamingApi) {
+            // 使用流式API
+            new Thread(() -> {
+                callStreamApi(text, activeThreadId, loadingMessage, activeSession, activeThreadId, activeSessionId, originalText);
+            }).start();
+        } else {
+            // 使用同步API
+            new Thread(() -> {
+                try {
+                    // 调用AI接口获取回复
+                    String aiResponse = callAiApi(text, activeThreadId);
+                    // 在JavaFX应用线程中更新UI（必须在UI线程中操作JavaFX组件）
+                    Platform.runLater(() -> {
+                        // 检查当前会话是否仍是发起请求时的会话
+                        if (currentSession == activeSession && threadId.equals(activeThreadId)) {
+                            // 移除加载中的消息
+                            messages.remove(loadingMessage);
+                            // 添加AI回复（确保响应文本不为null）
+                            String responseText = aiResponse != null ? aiResponse : "抱歉，未收到有效响应。";
+                            ChatMessage aiMessage = new ChatMessage(ChatMessage.Role.AI, responseText, LocalDateTime.now());
+                            messages.add(aiMessage);
+                            currentSession.addMessage(aiMessage); // 保存到会话历史
+                            // 刷新会话列表以更新标题（会话标题可能基于第一条消息生成）
+                            sessionList.refresh();
+                            // 恢复发送按钮状态
+                            sendBtn.setText(originalText);
+                            sendBtn.setDisable(false);
+
+                            // 保存会话到本地
+                            saveCurrentSession();
+
+                            // 滚动到底部以显示最新消息
+                            scrollToBottom();
+                        } else {
+                            // 如果当前会话已改变，将响应暂存到对应的会话ID
+                            messages.remove(loadingMessage);
+
+                            // 恢复发送按钮状态
+                            sendBtn.setText(originalText);
+                            sendBtn.setDisable(false);
+
+                            // 保存当前会话
+                            saveCurrentSession();
+
+                            // 将响应暂存到对应的会话ID
+                            if (aiResponse != null) {
+                                pendingResponses.put(activeSessionId, aiResponse);
+                            }
                         }
-                    }
-                });
-            } catch (Exception e) {
-                // 捕获异常并显示错误消息
-                e.printStackTrace();
-                // 在UI线程中显示错误信息
-                Platform.runLater(() -> {
-                    // 检查当前会话是否仍是发起请求时的会话
-                    if (currentSession == activeSession && threadId.equals(activeThreadId)) {
-                        // 移除加载中的消息
-                        messages.remove(loadingMessage);
-                        // 添加错误消息
-                        ChatMessage errorMessage = new ChatMessage(ChatMessage.Role.AI, "抱歉，处理请求时发生错误，请稍后重试。", LocalDateTime.now());
-                        messages.add(errorMessage);
-                        currentSession.addMessage(errorMessage);
-                        // 刷新会话列表以更新标题
-                        sessionList.refresh();
-                        // 恢复发送按钮状态
-                        sendBtn.setText(originalText);
-                        sendBtn.setDisable(false);
-                        
-                        // 保存会话到本地
-                        saveCurrentSession();
-                    } else {
-                        // 如果当前会话已改变，将错误暂存到对应的会话ID
-                        messages.remove(loadingMessage);
-                        
-                        // 恢复发送按钮状态
-                        sendBtn.setText(originalText);
-                        sendBtn.setDisable(false);
-                        
-                        // 保存当前会话
-                        saveCurrentSession();
-                        
-                        // 将错误信息暂存到对应的会话ID
-                        pendingErrors.put(activeSessionId, "抱歉，处理请求时发生错误，请稍后重试。");
-                    }
-                });
-            }
-        }).start();
+                    });
+                } catch (Exception e) {
+                    // 捕获异常并显示错误消息
+                    e.printStackTrace();
+                    // 在UI线程中显示错误信息
+                    Platform.runLater(() -> {
+                        // 检查当前会话是否仍是发起请求时的会话
+                        if (currentSession == activeSession && threadId.equals(activeThreadId)) {
+                            // 移除加载中的消息
+                            messages.remove(loadingMessage);
+                            // 添加错误消息
+                            ChatMessage errorMessage = new ChatMessage(ChatMessage.Role.AI, "抱歉，处理请求时发生错误，请稍后重试。", LocalDateTime.now());
+                            messages.add(errorMessage);
+                            currentSession.addMessage(errorMessage);
+                            // 刷新会话列表以更新标题
+                            sessionList.refresh();
+                            // 恢复发送按钮状态
+                            sendBtn.setText(originalText);
+                            sendBtn.setDisable(false);
+
+                            // 保存会话到本地
+                            saveCurrentSession();
+                        } else {
+                            // 如果当前会话已改变，将错误暂存到对应的会话ID
+                            messages.remove(loadingMessage);
+
+                            // 恢复发送按钮状态
+                            sendBtn.setText(originalText);
+                            sendBtn.setDisable(false);
+
+                            // 保存当前会话
+                            saveCurrentSession();
+
+                            // 将错误信息暂存到对应的会话ID
+                            pendingErrors.put(activeSessionId, "抱歉，处理请求时发生错误，请稍后重试。");
+                        }
+                    });
+                }
+            }).start();
+        }
+
+        // 在后台线程中异步调用AI流式接口（避免阻塞UI线程）
+//        new Thread(() -> {
+//            callStreamApi(text, activeThreadId, loadingMessage, activeSession, activeThreadId, activeSessionId, originalText);
+//        }).start();
     }
 
     /**
      * 调用AI接口，发送用户查询并获取AI回复
-     * 
+     *
      * @param query 用户查询文本
      * @return AI回复内容，如果出错则返回错误提示信息
      */
     private String callAiApi(String query, String threadId) {
         try {
             // 构建请求URL（后端AI服务地址）
+            log.info("调用AI同步接口，会话ID：{}", threadId);
             URL url = new URL("http://localhost:8090/aiAgent/chat");
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
 
@@ -980,33 +1022,219 @@ public final class ChatAssistantViewResult extends BorderPane {
     }
 
     /**
+     * 调用AI流式接口，发送用户查询并获取AI回复
+     *
+     * @param query 用户查询文本
+     * @param threadId 会话ID
+     * @param loadingMessage 加载中的消息对象
+     * @param activeSession 当前活跃的会话
+     * @param activeThreadId 当前活跃的会话ID
+     * @param activeSessionId 当前活跃的会话ID（字符串）
+     * @param originalText 原始按钮文本
+     */
+    private void callStreamApi(String query, String threadId, ChatMessage loadingMessage, ChatSession activeSession, String activeThreadId, String activeSessionId, String originalText) {
+        try {
+            // 构建请求URL（后端AI流式服务地址）
+            log.info("调用AI流式接口，会话ID：{}", threadId);
+            URL url = new URL("http://localhost:8090/aiAgent/stream");
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+
+            // 构建请求参数
+            Map<String, Object> queryMap = new HashMap<>(2);
+            queryMap.put("query", query);
+            queryMap.put("threadId", threadId);
+
+            // 设置请求方式和请求头，确保后台识别 JSON 格式
+            connection.setRequestMethod("POST");
+            connection.setDoOutput(true);
+            connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+            connection.setRequestProperty("Accept", "text/event-stream");
+
+            // 发送请求体到服务器
+            try (java.io.OutputStream os = connection.getOutputStream()) {
+                byte[] input = createJsonString(queryMap).getBytes(StandardCharsets.UTF_8);
+                os.write(input, 0, input.length);
+            }
+
+            // 读取服务器流式响应
+            int responseCode = connection.getResponseCode();
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                // 成功响应：读取流式响应内容
+                try (java.io.BufferedReader br = new java.io.BufferedReader(
+                        new java.io.InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
+
+                    // 先移除加载中的消息
+                    Platform.runLater(() -> {
+                        if (currentSession == activeSession && this.threadId.equals(activeThreadId)) {
+                            messages.remove(loadingMessage);
+                        }
+                    });
+
+                    StringBuilder fullResponse = new StringBuilder();
+                    String responseLine;
+
+                    // 创建一个可变的文本容器
+                    StringBuilder aiMessageText = new StringBuilder();
+
+                    // 添加空的AI消息
+                    ChatMessage initialAiMessage = new ChatMessage(ChatMessage.Role.AI, "", LocalDateTime.now());
+                    AtomicInteger initialIndex = new AtomicInteger(-1);
+
+                    Platform.runLater(() -> {
+                        if (currentSession == activeSession && this.threadId.equals(activeThreadId)) {
+                            messages.add(initialAiMessage);
+                            initialIndex.set(messages.size() - 1); // 记录初始消息的索引
+                        }
+                    });
+
+                    // 逐行读取流式响应（SSE格式）
+                    while ((responseLine = br.readLine()) != null) {
+                        // 检查是否为SSE数据行（以"data:"开头）
+                        if (responseLine.startsWith("data:")) {
+                            // 提取数据部分
+                            String dataPart = responseLine.substring(5).trim(); // 移除"data:"前缀
+
+                            try {
+                                // 解析JSON响应
+                                ObjectMapper mapper = new ObjectMapper();
+                                JsonNode rootNode = mapper.readTree(dataPart);
+                                String type = rootNode.get("type").asText();
+
+                                if ("chunk".equals(type)) {
+                                    // 获取内容并追加到完整响应
+                                    String content = rootNode.get("content").asText();
+                                    fullResponse.append(content);
+                                    aiMessageText.append(content);
+
+                                    // 在JavaFX应用线程中更新UI - 重新创建消息并替换
+                                    Platform.runLater(() -> {
+                                        if (currentSession == activeSession && this.threadId.equals(activeThreadId)) {
+                                            // 从消息列表中移除旧消息并添加更新后的消息
+                                            if (initialIndex.get() >= 0 && initialIndex.get() < messages.size()) {
+                                                ChatMessage updatedMessage = new ChatMessage(ChatMessage.Role.AI, aiMessageText.toString(), initialAiMessage.getCreatedAt());
+                                                messages.set(initialIndex.get(), updatedMessage); // 使用set方法更新列表中的消息
+
+                                                // 确保在UI更新完成后滚动到底部
+                                                Platform.runLater(() -> {
+                                                    scrollToBottom();
+                                                });
+                                            }
+                                        }
+                                    });
+                                } else if ("end".equals(type)) {
+                                    // 流结束，完成处理
+                                    Platform.runLater(() -> {
+                                        if (currentSession == activeSession && this.threadId.equals(activeThreadId)) {
+                                            // 创建最终的消息并添加到会话历史
+                                            ChatMessage finalMessage = new ChatMessage(ChatMessage.Role.AI, aiMessageText.toString(), initialAiMessage.getCreatedAt());
+                                            currentSession.addMessage(finalMessage);
+                                            // 刷新会话列表以更新标题
+                                            sessionList.refresh();
+                                            // 恢复发送按钮状态
+                                            sendBtn.setText(originalText);
+                                            sendBtn.setDisable(false);
+
+                                            // 保存会话到本地
+                                            saveCurrentSession();
+                                        } else {
+                                            // 如果当前会话已改变，将响应暂存到对应的会话ID
+                                            pendingResponses.put(activeSessionId, fullResponse.toString());
+                                        }
+                                    });
+                                    return; // 退出循环
+                                }
+                            } catch (Exception e) {
+                                // 如果解析JSON失败，记录错误但继续处理
+                                System.err.println("解析SSE数据失败: " + dataPart);
+                            }
+                        }
+                        // 忽略非数据行（如空行或其他SSE字段）
+                    }
+                }
+            } else {
+                // HTTP错误响应
+                String errorMsg = "抱歉，调用AI接口失败，错误码：" + responseCode;
+                Platform.runLater(() -> {
+                    if (currentSession == activeSession && this.threadId.equals(activeThreadId)) {
+                        // 移除加载中的消息
+                        messages.remove(loadingMessage);
+                        // 添加错误消息
+                        ChatMessage errorMessage = new ChatMessage(ChatMessage.Role.AI, errorMsg, LocalDateTime.now());
+                        messages.add(errorMessage);
+                        currentSession.addMessage(errorMessage);
+                        // 刷新会话列表以更新标题
+                        sessionList.refresh();
+                        // 恢复发送按钮状态
+                        sendBtn.setText(originalText);
+                        sendBtn.setDisable(false);
+
+                        // 保存会话到本地
+                        saveCurrentSession();
+
+                        // 滚动到底部以显示最新消息
+                        scrollToBottom();
+                    } else {
+                        // 如果当前会话已改变，将错误暂存到对应的会话ID
+                        pendingErrors.put(activeSessionId, errorMsg);
+                    }
+                });
+            }
+        } catch (Exception e) {
+            // 捕获所有异常并返回友好的错误提示
+            log.error(e.getMessage(), e);
+            String errorMsg = "抱歉，调用AI接口时发生错误：" + e.getMessage();
+            Platform.runLater(() -> {
+                if (currentSession == activeSession && this.threadId.equals(activeThreadId)) {
+                    // 移除加载中的消息
+                    messages.remove(loadingMessage);
+                    // 添加错误消息
+                    ChatMessage errorMessage = new ChatMessage(ChatMessage.Role.AI, errorMsg, LocalDateTime.now());
+                    messages.add(errorMessage);
+                    currentSession.addMessage(errorMessage);
+                    // 刷新会话列表以更新标题
+                    sessionList.refresh();
+                    // 恢复发送按钮状态
+                    sendBtn.setText(originalText);
+                    sendBtn.setDisable(false);
+
+                    // 保存会话到本地
+                    saveCurrentSession();
+                } else {
+                    // 如果当前会话已改变，将错误暂存到对应的会话ID
+                    pendingErrors.put(activeSessionId, errorMsg);
+                }
+            });
+        }
+    }
+
+    /**
      * 创建JSON字符串
      * 将Map转换为JSON格式的字符串
-     * 
+     *
      * @param map 要转换的Map对象
      * @return JSON格式的字符串
      */
     private String createJsonString(Map<String, Object> map) {
         StringBuilder json = new StringBuilder();
         json.append("{");
-        
+
         boolean first = true;
         for (Map.Entry<String, Object> entry : map.entrySet()) {
             if (!first) {
                 json.append(",");
             }
             json.append("\"").append(escapeJson(entry.getKey())).append("\":");
-            
+
             Object value = entry.getValue();
             if (value instanceof String) {
                 json.append("\"").append(escapeJson((String) value)).append("\"");
             } else {
                 json.append(value.toString());
             }
-            
+
             first = false;
         }
-        
+
         json.append("}");
         return json.toString();
     }
@@ -1058,7 +1286,7 @@ public final class ChatAssistantViewResult extends BorderPane {
     /**
      * 构建用户消息内容
      * 将用户输入的文本和上传的文件信息组合成完整的消息内容
-     * 
+     *
      * @param text 用户输入的文本
      * @param files 上传的文件列表
      * @return 构建后的消息内容字符串
@@ -1113,7 +1341,7 @@ public final class ChatAssistantViewResult extends BorderPane {
     /**
      * 获取文件扩展名
      * 从文件名中提取扩展名并转换为小写
-     * 
+     *
      * @param name 文件名（可能包含路径）
      * @return 文件扩展名（小写），如果没有扩展名则返回空字符串
      */
@@ -1128,7 +1356,7 @@ public final class ChatAssistantViewResult extends BorderPane {
     /**
      * 显示提示对话框
      * 显示一个信息提示对话框，用于向用户展示错误或提示信息
-     * 
+     *
      * @param title 对话框标题
      * @param content 对话框内容文本
      */
@@ -1143,14 +1371,14 @@ public final class ChatAssistantViewResult extends BorderPane {
     /**
      * 加载图标
      * 从资源文件加载图标，如果加载失败则使用fallback表情符号
-     * 
+     *
      * @param resourcePath 图标资源路径（相对于resources目录）
      * @param fallbackEmoji 如果图标文件不存在时使用的fallback表情符号
      * @return 图标节点（ImageView或Text）
      */
     private static Node loadIcon(String resourcePath, String fallbackEmoji) {
         try {
-            var url = ChatAssistantViewResult.class.getResource(resourcePath);
+            var url = ChatAssistantView.class.getResource(resourcePath);
             if (url == null) {
                 var text = new Text(fallbackEmoji);
                 text.setStyle("-fx-font-size: 20px;");
@@ -1188,14 +1416,14 @@ public final class ChatAssistantViewResult extends BorderPane {
                 var loadingContainer = new HBox();
                 loadingContainer.setAlignment(Pos.CENTER_LEFT);
                 loadingContainer.setPadding(new Insets(12, 16, 12, 16));
-                
+
                 var loadingLabel = new Label("正在思考...");
                 loadingLabel.getStyleClass().add("loading-text");
-                
+
                 // 创建加载动画效果
                 var loadingIndicator = new Label("● ● ●");
                 loadingIndicator.getStyleClass().add("loading-indicator");
-                
+
                 // 添加加载动画效果
                 Timeline timeline = new Timeline(
                     new KeyFrame(Duration.ZERO, new KeyValue(loadingIndicator.opacityProperty(), 0.3)),
@@ -1204,10 +1432,10 @@ public final class ChatAssistantViewResult extends BorderPane {
                 );
                 timeline.setCycleCount(Timeline.INDEFINITE);
                 timeline.play();
-                
+
                 loadingContainer.getChildren().addAll(loadingLabel, loadingIndicator);
                 loadingContainer.getStyleClass().add("loading-container");
-                
+
                 setText(null);
                 setGraphic(loadingContainer);
                 return;
@@ -1219,7 +1447,7 @@ public final class ChatAssistantViewResult extends BorderPane {
             VBox markdownContent = MarkdownRenderer.render(item.getText(), 16, textColor);
             markdownContent.setMaxWidth(600); // 设置最大宽度，防止消息气泡过宽
             markdownContent.getStyleClass().add("bubble-content");
-                        
+
             // 创建复制按钮
             Button copyButton = new Button();
             copyButton.setGraphic(new Text("📋"));
@@ -1230,12 +1458,12 @@ public final class ChatAssistantViewResult extends BorderPane {
                 ClipboardContent content = new ClipboardContent();
                 content.putString(item.getText());
                 clipboard.setContent(content);
-                                        
+
                 // 临时改变按钮外观以提供视觉反馈
                 String originalText = copyButton.getText();
                 copyButton.setText("✓");
                 copyButton.setTooltip(new Tooltip("已复制"));
-                                        
+
                 // 1秒后恢复原始图标
                 new Timeline(new KeyFrame(Duration.seconds(1), ev -> {
                     copyButton.setGraphic(new Text("📋"));
@@ -1243,36 +1471,36 @@ public final class ChatAssistantViewResult extends BorderPane {
                     copyButton.setTooltip(new Tooltip("复制此消息"));
                 })).play();
             });
-                                    
+
             // 设置复制按钮的最小尺寸和样式
             copyButton.setMinSize(24, 24);
             copyButton.setMaxSize(24, 24);
             copyButton.setStyle("-fx-background-color: transparent; -fx-cursor: hand;" +
                               "-fx-text-fill: #999; -fx-font-size: 14px; -fx-padding: 0;" +
                               "-fx-border-color: transparent; -fx-alignment: center;");
-                        
+
             // 创建时间标签
             Label timeLabel = new Label(formatTime(item.getCreatedAt()));
             timeLabel.getStyleClass().add("message-time");
             timeLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #94a3b8; -fx-opacity: 0.8;");
-                        
+
             // 创建时间与复制按钮的容器（在同一行）
             HBox timeAndCopyContainer = new HBox(8, timeLabel, copyButton);
             timeAndCopyContainer.setAlignment(Pos.CENTER_LEFT);
-                        
+
             // 将时间标签和复制按钮放在内容下方
             VBox messageWithTime = new VBox(markdownContent, timeAndCopyContainer);
             messageWithTime.setMaxWidth(600);
             messageWithTime.getStyleClass().add("bubble-content");
-                        
+
             VBox finalMarkdownContent = messageWithTime;
-                        
+
             // 创建消息气泡容器（VBox用于垂直布局，支持代码块等块级元素）
             var bubble = new VBox();
             bubble.getStyleClass().add("bubble");
             bubble.getChildren().add(finalMarkdownContent);
             bubble.setMaxWidth(600);
-                        
+
             // 创建消息内容容器
             var contentContainer = new HBox();
             if (item.getRole() == ChatMessage.Role.USER) {
@@ -1284,9 +1512,9 @@ public final class ChatAssistantViewResult extends BorderPane {
                 contentContainer.getChildren().add(bubble);
                 contentContainer.setAlignment(Pos.CENTER_LEFT);
             }
-                        
+
             contentContainer.getStyleClass().add("message-content-wrapper");
-            
+
             // 创建消息行容器（HBox用于水平布局，控制消息对齐方式）
             var row = new HBox();
             row.getStyleClass().add("bubble-row");
@@ -1305,7 +1533,7 @@ public final class ChatAssistantViewResult extends BorderPane {
                     });
                 }
             });
-            
+
             if (item.getRole() == ChatMessage.Role.USER) {
                 row.setAlignment(Pos.TOP_RIGHT);
                 bubble.getStyleClass().add("bubble-user");
@@ -1313,14 +1541,14 @@ public final class ChatAssistantViewResult extends BorderPane {
                 row.setAlignment(Pos.TOP_LEFT);
                 bubble.getStyleClass().add("bubble-ai");
             }
-        
+
             row.getChildren().add(contentContainer);
-        
+
             setText(null);
             setGraphic(row);
         }
     }
-        
+
     /**
      * 文件项单元格类，用于显示上传的文件
      */
@@ -1356,26 +1584,56 @@ public final class ChatAssistantViewResult extends BorderPane {
             setGraphic(row);
         }
     }
-    
+
     /**
      * 会话单元格类，用于显示会话列表项
      * 显示会话标题和更新时间，支持选中状态高亮
      * 时间显示格式：今天显示时间，昨天显示"昨天"，更早显示日期
      */
-    private static final class SessionCell extends ListCell<ChatSession> {
+    private final class SessionCell extends ListCell<ChatSession> {
         private final VBox container = new VBox(4);
         private final Label titleLabel = new Label();
         private final Label timeLabel = new Label();
-        
-        public SessionCell() {
+        private final Button deleteBtn = new Button("🗑️"); // 彩色垃圾桶图标
+        private final ChatAssistantView parentView;
+
+        public SessionCell(ChatAssistantView parentView) {
+            this.parentView = parentView;
             container.getStyleClass().add("session-item");
             container.setPadding(new Insets(12));
             titleLabel.getStyleClass().add("session-title");
             titleLabel.setWrapText(true);
             timeLabel.getStyleClass().add("session-time");
-            container.getChildren().addAll(titleLabel, timeLabel);
+
+            // 配置删除按钮样式
+            deleteBtn.getStyleClass().add("session-delete-btn");
+            deleteBtn.setStyle("-fx-background-color: transparent; -fx-cursor: hand;");
+            deleteBtn.setTooltip(new Tooltip("删除此会话"));
+
+            // 创建会话项内容布局
+            var contentRow = new HBox(8, titleLabel, new Region(), timeLabel, deleteBtn);
+            HBox.setHgrow(contentRow.getChildren().get(1), Priority.ALWAYS); // 让中间的区域扩展
+            container.getChildren().add(contentRow);
+
+            // 删除按钮点击事件处理
+            deleteBtn.setOnAction(e -> {
+                ChatSession sessionToDelete = getItem();
+                if (sessionToDelete != null) {
+                    // 确认删除对话
+                    Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+                    alert.setTitle("确认删除");
+                    alert.setHeaderText("确定要删除此会话吗？");
+                    alert.setContentText("会话: " + sessionToDelete.getTitle());
+
+                    Optional<ButtonType> result = alert.showAndWait();
+                    if (result.isPresent() && result.get() == ButtonType.OK) {
+                        // 调用外部类的删除会话方法
+                        parentView.deleteSession(sessionToDelete);
+                    }
+                }
+            });
         }
-        
+
         @Override
         protected void updateItem(ChatSession session, boolean empty) {
             super.updateItem(session, empty);
@@ -1386,8 +1644,8 @@ public final class ChatAssistantViewResult extends BorderPane {
             }
 
             titleLabel.setText(session.getTitle());
-            timeLabel.setText(ChatAssistantViewResult.formatTime(session.getUpdatedAt()));
-            
+            timeLabel.setText(ChatAssistantView.formatTime(session.getUpdatedAt()));
+
             // 根据选中状态更新样式
             if (isSelected()) {
                 container.getStyleClass().removeAll("session-item");
@@ -1398,10 +1656,55 @@ public final class ChatAssistantViewResult extends BorderPane {
                     container.getStyleClass().add("session-item");
                 }
             }
-            
+
             setText(null);
             setGraphic(container);
         }
+    }
+
+    /**
+     * 切换API模式
+     * @param streaming true表示使用流式API，false表示使用同步API
+     */
+    public void toggleApiMode(boolean streaming) {
+        this.useStreamingApi = streaming;
+        System.out.println("API模式已切换到: " + (streaming ? "流式" : "同步"));
+    }
+
+    /**
+     * 更新API模式按钮的图标和提示
+     * @param button API模式切换按钮
+     */
+    private void updateApiModeButton(Button button) {
+        if (useStreamingApi) {
+            // 流式模式，使用流式图标
+            button.setGraphic(new Label("🌊"));
+            button.setTooltip(new Tooltip("当前模式：流式 (点击切换到同步)"));
+        } else {
+            // 同步模式，使用同步图标
+            button.setGraphic(new Label("📦"));
+            button.setTooltip(new Tooltip("当前模式：同步 (点击切换到流式)"));
+        }
+    }
+
+    /**
+     * 删除指定的会话
+     * @param sessionToDelete 要删除的会话
+     */
+    public void deleteSession(ChatSession sessionToDelete) {
+        // 从会话列表中移除会话
+        sessions.remove(sessionToDelete);
+
+        // 如果删除的是当前会话，则清除当前会话
+        if (currentSession == sessionToDelete) {
+            currentSession = null;
+            threadId = UUID.randomUUID().toString();
+            messages.clear();
+            seedWelcome();
+        }
+
+        // 保存会话列表到本地
+        saveAllSessions();
     }
 }
 

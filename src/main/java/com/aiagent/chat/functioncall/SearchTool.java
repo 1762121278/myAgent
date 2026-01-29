@@ -1,4 +1,4 @@
-package com.aiagent.functioncall;
+package com.aiagent.chat.functioncall;
 
 /**
  * @author jiangtao.shu

@@ -1,8 +1,8 @@
-package com.aiagent.util;
+package com.aiagent.chat.util;
 
-import com.aiagent.model.ChatMessage;
-import com.aiagent.model.ChatSession;
-import com.aiagent.model.UploadedFileItem;
+import com.aiagent.chat.model.ChatMessage;
+import com.aiagent.chat.model.ChatSession;
+import com.aiagent.chat.model.UploadedFileItem;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import java.io.File;

@@ -1,13 +1,12 @@
-package com.aiagent.ui;
+package com.aiagent.chat.ui;
 
-import com.aiagent.model.ChatMessage;
-import com.aiagent.model.ChatSession;
-import com.aiagent.model.UploadedFileItem;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
-import java.util.regex.Pattern;
+import com.aiagent.chat.model.ChatMessage;
+import com.aiagent.chat.model.ChatSession;
+import com.aiagent.chat.model.UploadedFileItem;
+import com.aiagent.chat.util.SessionStorageManager;
+import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
+import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
@@ -26,22 +25,16 @@ import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.*;
 import javafx.scene.text.Text;
 import javafx.stage.FileChooser;
-import javafx.animation.KeyFrame;
-import javafx.animation.KeyValue;
-import javafx.animation.Timeline;
 import javafx.util.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.io.File;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.aiagent.util.SessionStorageManager;
 
 /**
  * 聊天助手视图类，负责显示聊天界面和处理用户交互
@@ -55,7 +48,7 @@ import com.aiagent.util.SessionStorageManager;
  * 
  * @author jiangtao.shu
  */
-public final class ChatAssistantView extends BorderPane {
+public final class ChatAssistantViewResult extends BorderPane {
     /** 桌面版宽度 - 用于设置界面默认宽度 */
     private static final double DESKTOP_WIDTH = 1400;
     /** 移动版断点宽度 - 小于此宽度时应用移动端样式 */
@@ -70,13 +63,13 @@ public final class ChatAssistantView extends BorderPane {
     private static final Set<String> DOC_EXT = Set.of("pdf", "doc", "docx", "txt");
     /** 支持的图片扩展名 */
     private static final Set<String> IMG_EXT = Set.of("jpg", "jpeg", "png");
-    private static final Logger log = LoggerFactory.getLogger(ChatAssistantView.class);
+    private static final Logger log = LoggerFactory.getLogger(ChatAssistantViewResult.class);
 
     /** 聊天消息列表 */
     private final ObservableList<ChatMessage> messages = FXCollections.observableArrayList();
     /** 上传文件列表 */
     private final ObservableList<UploadedFileItem> uploadedFiles = FXCollections.observableArrayList();
-    
+
     /** 会话列表 */
     private final ObservableList<ChatSession> sessions = FXCollections.observableArrayList();
     /** 当前会话 */
@@ -88,7 +81,7 @@ public final class ChatAssistantView extends BorderPane {
     private final ListView<ChatMessage> messageList = new ListView<>();
     /** 消息滚动容器 */
     private final ScrollPane messageScrollShell = new ScrollPane();
-    
+
     /** 会话列表视图 */
     private final ListView<ChatSession> sessionList = new ListView<>();
     /** 侧边栏容器 */
@@ -107,27 +100,24 @@ public final class ChatAssistantView extends BorderPane {
     private final TextArea input = new TextArea();
     /** 发送按钮 */
     private final Button sendBtn = new Button("发送");
-    
+
     /** 当前线程ID */
     private String threadId;
-    
+
     /** 会话存储管理器 */
     private final SessionStorageManager sessionStorageManager;
-    
+
     /** 待处理的AI响应映射表，key为sessionId，value为响应内容 */
     private final Map<String, String> pendingResponses = new HashMap<>();
-    
+
     /** 待处理的错误信息映射表，key为sessionId，value为错误信息 */
     private final Map<String, String> pendingErrors = new HashMap<>();
-    
-    /** 是否使用流式API，默认为true */
-    private boolean useStreamingApi = true;
-    
+
     /**
      * 构造函数，初始化聊天助手视图
      * 构建完整的UI布局：顶部标题栏、侧边栏、聊天区域和输入区域
      */
-    public ChatAssistantView() {
+    public ChatAssistantViewResult() {
         // 初始化会话存储管理器
         this.sessionStorageManager = new SessionStorageManager();
         
@@ -595,20 +585,8 @@ public final class ChatAssistantView extends BorderPane {
         sendBtn.getStyleClass().add("send-btn");
         sendBtn.setDefaultButton(true);
         sendBtn.setDisable(true);
-        
-        // 创建API模式切换按钮
-        var apiModeToggleBtn = new Button();
-        apiModeToggleBtn.getStyleClass().addAll("icon-btn", "api-mode-toggle-btn");
-        apiModeToggleBtn.setTooltip(new Tooltip("切换API模式：流式/同步"));
-        // 根据当前模式设置按钮图标
-        updateApiModeButton(apiModeToggleBtn);
-        apiModeToggleBtn.setOnAction(e -> {
-            // 切换API模式
-            useStreamingApi = !useStreamingApi;
-            updateApiModeButton(apiModeToggleBtn);
-        });
 
-        toolsRow.getChildren().addAll(depthThinkingBtn, modelSelectBtn, modelArrowBtn, micBtn, attachBtn, imageBtn, apiModeToggleBtn, sendBtn);
+        toolsRow.getChildren().addAll(depthThinkingBtn, modelSelectBtn, modelArrowBtn, micBtn, attachBtn, imageBtn, sendBtn);
 
         wrap.getChildren().addAll(filesContainer, input, toolsRow);
         return wrap;
@@ -833,8 +811,7 @@ public final class ChatAssistantView extends BorderPane {
 
         // 获取用户输入的文本和上传的文件
         String text = input.getText() == null ? "" : input.getText().trim();
-        // 创建文件列表的快照
-        var filesSnapshot = List.copyOf(uploadedFiles);
+        var filesSnapshot = List.copyOf(uploadedFiles); // 创建文件列表的快照
 
         // 移除欢迎消息（如果存在），因为用户已经开始对话
         messages.removeIf(this::isWelcomeMessage);
@@ -860,104 +837,87 @@ public final class ChatAssistantView extends BorderPane {
         // 保存当前会话的引用，用于后续验证
         ChatSession activeSession = currentSession;
         String activeThreadId = threadId;
-        // 保存会话ID
-        String activeSessionId = currentSession.getId();
+        String activeSessionId = currentSession.getId(); // 保存会话ID
 
-        // 根据配置决定使用哪种API方式
-        if (useStreamingApi) {
-            // 使用流式API
-            new Thread(() -> {
-                callStreamApi(text, activeThreadId, loadingMessage, activeSession, activeThreadId, activeSessionId, originalText);
-            }).start();
-        } else {
-            // 使用同步API
-            new Thread(() -> {
-                try {
-                    // 调用AI接口获取回复
-                    String aiResponse = callAiApi(text, activeThreadId);
-                    // 在JavaFX应用线程中更新UI（必须在UI线程中操作JavaFX组件）
-                    Platform.runLater(() -> {
-                        // 检查当前会话是否仍是发起请求时的会话
-                        if (currentSession == activeSession && threadId.equals(activeThreadId)) {
-                            // 移除加载中的消息
-                            messages.remove(loadingMessage);
-                            // 添加AI回复（确保响应文本不为null）
-                            String responseText = aiResponse != null ? aiResponse : "抱歉，未收到有效响应。";
-                            ChatMessage aiMessage = new ChatMessage(ChatMessage.Role.AI, responseText, LocalDateTime.now());
-                            messages.add(aiMessage);
-                            currentSession.addMessage(aiMessage); // 保存到会话历史
-                            // 刷新会话列表以更新标题（会话标题可能基于第一条消息生成）
-                            sessionList.refresh();
-                            // 恢复发送按钮状态
-                            sendBtn.setText(originalText);
-                            sendBtn.setDisable(false);
-                            
-                            // 保存会话到本地
-                            saveCurrentSession();
-                            
-                            // 滚动到底部以显示最新消息
-                            scrollToBottom();
-                        } else {
-                            // 如果当前会话已改变，将响应暂存到对应的会话ID
-                            messages.remove(loadingMessage);
-                            
-                            // 恢复发送按钮状态
-                            sendBtn.setText(originalText);
-                            sendBtn.setDisable(false);
-                            
-                            // 保存当前会话
-                            saveCurrentSession();
-                            
-                            // 将响应暂存到对应的会话ID
-                            if (aiResponse != null) {
-                                pendingResponses.put(activeSessionId, aiResponse);
-                            }
+        // 在后台线程中异步调用AI接口（避免阻塞UI线程）
+        new Thread(() -> {
+            try {
+                // 调用AI接口获取回复
+                String aiResponse = callAiApi(text, activeThreadId);
+                // 在JavaFX应用线程中更新UI（必须在UI线程中操作JavaFX组件）
+                Platform.runLater(() -> {
+                    // 检查当前会话是否仍是发起请求时的会话
+                    if (currentSession == activeSession && threadId.equals(activeThreadId)) {
+                        // 移除加载中的消息
+                        messages.remove(loadingMessage);
+                        // 添加AI回复（确保响应文本不为null）
+                        String responseText = aiResponse != null ? aiResponse : "抱歉，未收到有效响应。";
+                        ChatMessage aiMessage = new ChatMessage(ChatMessage.Role.AI, responseText, LocalDateTime.now());
+                        messages.add(aiMessage);
+                        currentSession.addMessage(aiMessage); // 保存到会话历史
+                        // 刷新会话列表以更新标题（会话标题可能基于第一条消息生成）
+                        sessionList.refresh();
+                        // 恢复发送按钮状态
+                        sendBtn.setText(originalText);
+                        sendBtn.setDisable(false);
+                        
+                        // 保存会话到本地
+                        saveCurrentSession();
+                    } else {
+                        // 如果当前会话已改变，将响应暂存到对应的会话ID
+                        messages.remove(loadingMessage);
+                        
+                        // 恢复发送按钮状态
+                        sendBtn.setText(originalText);
+                        sendBtn.setDisable(false);
+                        
+                        // 保存当前会话
+                        saveCurrentSession();
+                        
+                        // 将响应暂存到对应的会话ID
+                        if (aiResponse != null) {
+                            pendingResponses.put(activeSessionId, aiResponse);
                         }
-                    });
-                } catch (Exception e) {
-                    // 捕获异常并显示错误消息
-                    e.printStackTrace();
-                    // 在UI线程中显示错误信息
-                    Platform.runLater(() -> {
-                        // 检查当前会话是否仍是发起请求时的会话
-                        if (currentSession == activeSession && threadId.equals(activeThreadId)) {
-                            // 移除加载中的消息
-                            messages.remove(loadingMessage);
-                            // 添加错误消息
-                            ChatMessage errorMessage = new ChatMessage(ChatMessage.Role.AI, "抱歉，处理请求时发生错误，请稍后重试。", LocalDateTime.now());
-                            messages.add(errorMessage);
-                            currentSession.addMessage(errorMessage);
-                            // 刷新会话列表以更新标题
-                            sessionList.refresh();
-                            // 恢复发送按钮状态
-                            sendBtn.setText(originalText);
-                            sendBtn.setDisable(false);
-                            
-                            // 保存会话到本地
-                            saveCurrentSession();
-                        } else {
-                            // 如果当前会话已改变，将错误暂存到对应的会话ID
-                            messages.remove(loadingMessage);
-                            
-                            // 恢复发送按钮状态
-                            sendBtn.setText(originalText);
-                            sendBtn.setDisable(false);
-                            
-                            // 保存当前会话
-                            saveCurrentSession();
-                            
-                            // 将错误信息暂存到对应的会话ID
-                            pendingErrors.put(activeSessionId, "抱歉，处理请求时发生错误，请稍后重试。");
-                        }
-                    });
-                }
-            }).start();
-        }
-
-        // 在后台线程中异步调用AI流式接口（避免阻塞UI线程）
-//        new Thread(() -> {
-//            callStreamApi(text, activeThreadId, loadingMessage, activeSession, activeThreadId, activeSessionId, originalText);
-//        }).start();
+                    }
+                });
+            } catch (Exception e) {
+                // 捕获异常并显示错误消息
+                e.printStackTrace();
+                // 在UI线程中显示错误信息
+                Platform.runLater(() -> {
+                    // 检查当前会话是否仍是发起请求时的会话
+                    if (currentSession == activeSession && threadId.equals(activeThreadId)) {
+                        // 移除加载中的消息
+                        messages.remove(loadingMessage);
+                        // 添加错误消息
+                        ChatMessage errorMessage = new ChatMessage(ChatMessage.Role.AI, "抱歉，处理请求时发生错误，请稍后重试。", LocalDateTime.now());
+                        messages.add(errorMessage);
+                        currentSession.addMessage(errorMessage);
+                        // 刷新会话列表以更新标题
+                        sessionList.refresh();
+                        // 恢复发送按钮状态
+                        sendBtn.setText(originalText);
+                        sendBtn.setDisable(false);
+                        
+                        // 保存会话到本地
+                        saveCurrentSession();
+                    } else {
+                        // 如果当前会话已改变，将错误暂存到对应的会话ID
+                        messages.remove(loadingMessage);
+                        
+                        // 恢复发送按钮状态
+                        sendBtn.setText(originalText);
+                        sendBtn.setDisable(false);
+                        
+                        // 保存当前会话
+                        saveCurrentSession();
+                        
+                        // 将错误信息暂存到对应的会话ID
+                        pendingErrors.put(activeSessionId, "抱歉，处理请求时发生错误，请稍后重试。");
+                    }
+                });
+            }
+        }).start();
     }
 
     /**
@@ -969,7 +929,6 @@ public final class ChatAssistantView extends BorderPane {
     private String callAiApi(String query, String threadId) {
         try {
             // 构建请求URL（后端AI服务地址）
-            log.info("调用AI同步接口，会话ID：{}", threadId);
             URL url = new URL("http://localhost:8090/aiAgent/chat");
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
 
@@ -1020,192 +979,6 @@ public final class ChatAssistantView extends BorderPane {
         }
     }
 
-    /**
-     * 调用AI流式接口，发送用户查询并获取AI回复
-     * 
-     * @param query 用户查询文本
-     * @param threadId 会话ID
-     * @param loadingMessage 加载中的消息对象
-     * @param activeSession 当前活跃的会话
-     * @param activeThreadId 当前活跃的会话ID
-     * @param activeSessionId 当前活跃的会话ID（字符串）
-     * @param originalText 原始按钮文本
-     */
-    private void callStreamApi(String query, String threadId, ChatMessage loadingMessage, ChatSession activeSession, String activeThreadId, String activeSessionId, String originalText) {
-        try {
-            // 构建请求URL（后端AI流式服务地址）
-            log.info("调用AI流式接口，会话ID：{}", threadId);
-            URL url = new URL("http://localhost:8090/aiAgent/stream");
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-
-            // 构建请求参数
-            Map<String, Object> queryMap = new HashMap<>(2);
-            queryMap.put("query", query);
-            queryMap.put("threadId", threadId);
-
-            // 设置请求方式和请求头，确保后台识别 JSON 格式
-            connection.setRequestMethod("POST");
-            connection.setDoOutput(true);
-            connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-            connection.setRequestProperty("Accept", "text/event-stream");
-            
-            // 发送请求体到服务器
-            try (java.io.OutputStream os = connection.getOutputStream()) {
-                byte[] input = createJsonString(queryMap).getBytes(StandardCharsets.UTF_8);
-                os.write(input, 0, input.length);
-            }
-
-            // 读取服务器流式响应
-            int responseCode = connection.getResponseCode();
-            if (responseCode == HttpURLConnection.HTTP_OK) {
-                // 成功响应：读取流式响应内容
-                try (java.io.BufferedReader br = new java.io.BufferedReader(
-                        new java.io.InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
-                    
-                    // 先移除加载中的消息
-                    Platform.runLater(() -> {
-                        if (currentSession == activeSession && this.threadId.equals(activeThreadId)) {
-                            messages.remove(loadingMessage);
-                        }
-                    });
-                    
-                    StringBuilder fullResponse = new StringBuilder();
-                    String responseLine;
-                    
-                    // 创建一个可变的文本容器
-                    StringBuilder aiMessageText = new StringBuilder();
-                    
-                    // 添加空的AI消息
-                    ChatMessage initialAiMessage = new ChatMessage(ChatMessage.Role.AI, "", LocalDateTime.now());
-                    AtomicInteger initialIndex = new AtomicInteger(-1);
-                    
-                    Platform.runLater(() -> {
-                        if (currentSession == activeSession && this.threadId.equals(activeThreadId)) {
-                            messages.add(initialAiMessage);
-                            initialIndex.set(messages.size() - 1); // 记录初始消息的索引
-                        }
-                    });
-                    
-                    // 逐行读取流式响应（SSE格式）
-                    while ((responseLine = br.readLine()) != null) {
-                        // 检查是否为SSE数据行（以"data:"开头）
-                        if (responseLine.startsWith("data:")) {
-                            // 提取数据部分
-                            String dataPart = responseLine.substring(5).trim(); // 移除"data:"前缀
-                            
-                            try {
-                                // 解析JSON响应
-                                ObjectMapper mapper = new ObjectMapper();
-                                JsonNode rootNode = mapper.readTree(dataPart);
-                                String type = rootNode.get("type").asText();
-                                
-                                if ("chunk".equals(type)) {
-                                    // 获取内容并追加到完整响应
-                                    String content = rootNode.get("content").asText();
-                                    fullResponse.append(content);
-                                    aiMessageText.append(content);
-                                    
-                                    // 在JavaFX应用线程中更新UI - 重新创建消息并替换
-                                    Platform.runLater(() -> {
-                                        if (currentSession == activeSession && this.threadId.equals(activeThreadId)) {
-                                            // 从消息列表中移除旧消息并添加更新后的消息
-                                            if (initialIndex.get() >= 0 && initialIndex.get() < messages.size()) {
-                                                ChatMessage updatedMessage = new ChatMessage(ChatMessage.Role.AI, aiMessageText.toString(), initialAiMessage.getCreatedAt());
-                                                messages.set(initialIndex.get(), updatedMessage); // 使用set方法更新列表中的消息
-                                                
-                                                // 确保在UI更新完成后滚动到底部
-                                                Platform.runLater(() -> {
-                                                    scrollToBottom();
-                                                });
-                                            }
-                                        }
-                                    });
-                                } else if ("end".equals(type)) {
-                                    // 流结束，完成处理
-                                    Platform.runLater(() -> {
-                                        if (currentSession == activeSession && this.threadId.equals(activeThreadId)) {
-                                            // 创建最终的消息并添加到会话历史
-                                            ChatMessage finalMessage = new ChatMessage(ChatMessage.Role.AI, aiMessageText.toString(), initialAiMessage.getCreatedAt());
-                                            currentSession.addMessage(finalMessage);
-                                            // 刷新会话列表以更新标题
-                                            sessionList.refresh();
-                                            // 恢复发送按钮状态
-                                            sendBtn.setText(originalText);
-                                            sendBtn.setDisable(false);
-                                            
-                                            // 保存会话到本地
-                                            saveCurrentSession();
-                                        } else {
-                                            // 如果当前会话已改变，将响应暂存到对应的会话ID
-                                            pendingResponses.put(activeSessionId, fullResponse.toString());
-                                        }
-                                    });
-                                    return; // 退出循环
-                                }
-                            } catch (Exception e) {
-                                // 如果解析JSON失败，记录错误但继续处理
-                                System.err.println("解析SSE数据失败: " + dataPart);
-                            }
-                        }
-                        // 忽略非数据行（如空行或其他SSE字段）
-                    }
-                }
-            } else {
-                // HTTP错误响应
-                String errorMsg = "抱歉，调用AI接口失败，错误码：" + responseCode;
-                Platform.runLater(() -> {
-                    if (currentSession == activeSession && this.threadId.equals(activeThreadId)) {
-                        // 移除加载中的消息
-                        messages.remove(loadingMessage);
-                        // 添加错误消息
-                        ChatMessage errorMessage = new ChatMessage(ChatMessage.Role.AI, errorMsg, LocalDateTime.now());
-                        messages.add(errorMessage);
-                        currentSession.addMessage(errorMessage);
-                        // 刷新会话列表以更新标题
-                        sessionList.refresh();
-                        // 恢复发送按钮状态
-                        sendBtn.setText(originalText);
-                        sendBtn.setDisable(false);
-                        
-                        // 保存会话到本地
-                        saveCurrentSession();
-                        
-                        // 滚动到底部以显示最新消息
-                        scrollToBottom();
-                    } else {
-                        // 如果当前会话已改变，将错误暂存到对应的会话ID
-                        pendingErrors.put(activeSessionId, errorMsg);
-                    }
-                });
-            }
-        } catch (Exception e) {
-            // 捕获所有异常并返回友好的错误提示
-            log.error(e.getMessage(), e);
-            String errorMsg = "抱歉，调用AI接口时发生错误：" + e.getMessage();
-            Platform.runLater(() -> {
-                if (currentSession == activeSession && this.threadId.equals(activeThreadId)) {
-                    // 移除加载中的消息
-                    messages.remove(loadingMessage);
-                    // 添加错误消息
-                    ChatMessage errorMessage = new ChatMessage(ChatMessage.Role.AI, errorMsg, LocalDateTime.now());
-                    messages.add(errorMessage);
-                    currentSession.addMessage(errorMessage);
-                    // 刷新会话列表以更新标题
-                    sessionList.refresh();
-                    // 恢复发送按钮状态
-                    sendBtn.setText(originalText);
-                    sendBtn.setDisable(false);
-                    
-                    // 保存会话到本地
-                    saveCurrentSession();
-                } else {
-                    // 如果当前会话已改变，将错误暂存到对应的会话ID
-                    pendingErrors.put(activeSessionId, errorMsg);
-                }
-            });
-        }
-    }
-    
     /**
      * 创建JSON字符串
      * 将Map转换为JSON格式的字符串
@@ -1377,7 +1150,7 @@ public final class ChatAssistantView extends BorderPane {
      */
     private static Node loadIcon(String resourcePath, String fallbackEmoji) {
         try {
-            var url = ChatAssistantView.class.getResource(resourcePath);
+            var url = ChatAssistantViewResult.class.getResource(resourcePath);
             if (url == null) {
                 var text = new Text(fallbackEmoji);
                 text.setStyle("-fx-font-size: 20px;");
@@ -1613,7 +1386,7 @@ public final class ChatAssistantView extends BorderPane {
             }
 
             titleLabel.setText(session.getTitle());
-            timeLabel.setText(ChatAssistantView.formatTime(session.getUpdatedAt()));
+            timeLabel.setText(ChatAssistantViewResult.formatTime(session.getUpdatedAt()));
             
             // 根据选中状态更新样式
             if (isSelected()) {
@@ -1628,31 +1401,6 @@ public final class ChatAssistantView extends BorderPane {
             
             setText(null);
             setGraphic(container);
-        }
-    }
-    
-    /**
-     * 切换API模式
-     * @param streaming true表示使用流式API，false表示使用同步API
-     */
-    public void toggleApiMode(boolean streaming) {
-        this.useStreamingApi = streaming;
-        System.out.println("API模式已切换到: " + (streaming ? "流式" : "同步"));
-    }
-    
-    /**
-     * 更新API模式按钮的图标和提示
-     * @param button API模式切换按钮
-     */
-    private void updateApiModeButton(Button button) {
-        if (useStreamingApi) {
-            // 流式模式，使用流式图标
-            button.setGraphic(new Label("🌊"));
-            button.setTooltip(new Tooltip("当前模式：流式 (点击切换到同步)"));
-        } else {
-            // 同步模式，使用同步图标
-            button.setGraphic(new Label("📦"));
-            button.setTooltip(new Tooltip("当前模式：同步 (点击切换到流式)"));
         }
     }
 }
