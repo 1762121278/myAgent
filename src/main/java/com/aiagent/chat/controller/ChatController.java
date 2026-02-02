@@ -21,10 +21,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * @author jiangtao.shu
@@ -70,16 +67,18 @@ public class ChatController {
                         if (output instanceof StreamingOutput streamingOutput) {
                             if (streamingOutput.getOutputType() == OutputType.AGENT_MODEL_STREAMING) {
                                 // 发送 JSON 格式的流式数据
-                                sink.next(JSON.toJSONString(Map.of(
-                                        "type", "chunk",
-                                        "content",streamingOutput.message().getText()
-                                )));
+                                HashMap<String, String> map = new HashMap<>();
+                                map.put("type", "chunk");
+                                map.put("content", streamingOutput.message().getText());
+                                sink.next(JSON.toJSONString(map));
                             }
                         }
                     },
                     sink::error,
                     () -> {
-                        sink.next(JSON.toJSONString(Map.of("type", "end")));
+                        HashMap<String, String> map = new HashMap<>();
+                        map.put("type", "end");
+                        sink.next(JSON.toJSONString(map));
                         sink.complete();
                     }
             );

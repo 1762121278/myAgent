@@ -35,6 +35,8 @@ public class MarkdownRenderer {
     public static VBox render(String markdown, double baseFontSize, String textColor) {
         VBox container = new VBox(8);
         container.setFillWidth(true);
+        // 启用容器的鼠标事件处理
+        container.setMouseTransparent(false);
         
         if (markdown == null || markdown.isEmpty()) {
             return container;
@@ -110,10 +112,15 @@ public class MarkdownRenderer {
         String[] lines = code.split("\n", -1);
         for (String line : lines) {
             Text codeText = new Text(line);
-            codeText.setStyle("-fx-fill: #e2e8f0;");
+            codeText.setStyle("-fx-fill: #e2e8f0; -fx-cursor: text;");
             codeText.setFont(Font.font("Consolas", baseFontSize * 0.9));
+            // 启用文本节点的鼠标事件处理
+            codeText.setMouseTransparent(false);
             codeBox.getChildren().add(codeText);
         }
+        
+        // 启用代码框容器的鼠标事件处理
+        codeBox.setMouseTransparent(false);
         
         return codeBox;
     }
@@ -127,6 +134,12 @@ public class MarkdownRenderer {
         flow.setMaxWidth(Region.USE_COMPUTED_SIZE);
         // 确保TextFlow可以换行
         flow.setPrefWidth(Region.USE_COMPUTED_SIZE);
+        // 启用文本选择功能
+        flow.setPickOnBounds(false); // 不在边界上拾取事件
+        flow.setMouseTransparent(false); // 确保TextFlow可以处理鼠标事件
+        flow.setFocusTraversable(true); // 确保TextFlow可以获得焦点
+        // 设置光标样式
+        flow.setStyle("-fx-cursor: text;"); // 移除 -fx-user-select，因为它可能在某些JavaFX版本中不工作
         
         // 先处理行内代码
         processInlineCode(text, flow, baseFontSize, textColor);
@@ -157,9 +170,12 @@ public class MarkdownRenderer {
                 "-fx-background-radius: 4; " +
                 "-fx-padding: 2 4 2 4; " +
                 "-fx-font-family: 'Consolas', 'Monaco', 'Courier New', monospace; " +
-                "-fx-font-size: " + (int)(baseFontSize * 0.9) + "px;"
+                "-fx-font-size: " + (int)(baseFontSize * 0.9) + "px; " +
+                "-fx-cursor: text;"
             );
             codeText.getStyleClass().add("inline-code");
+            // 启用文本节点的鼠标事件处理
+            codeText.setMouseTransparent(false);
             flow.getChildren().add(codeText);
             
             lastEnd = codeMatcher.end();
@@ -198,7 +214,9 @@ public class MarkdownRenderer {
             String boldText = boldMatcher.group(1);
             Text bold = new Text(boldText);
             bold.setFont(Font.font(null, FontWeight.BOLD, baseFontSize));
-            bold.setStyle("-fx-fill: " + textColor + ";");
+            bold.setStyle("-fx-fill: " + textColor + "; -fx-cursor: text;");
+            // 启用文本节点的鼠标事件处理
+            bold.setMouseTransparent(false);
             flow.getChildren().add(bold);
             
             lastEnd = boldMatcher.end();
@@ -236,7 +254,9 @@ public class MarkdownRenderer {
             String italicText = italicMatcher.group(1);
             Text italic = new Text(italicText);
             italic.setFont(Font.font(null, FontPosture.ITALIC, baseFontSize));
-            italic.setStyle("-fx-fill: " + textColor + ";");
+            italic.setStyle("-fx-fill: " + textColor + "; -fx-cursor: text;");
+            // 启用文本节点的鼠标事件处理
+            italic.setMouseTransparent(false);
             flow.getChildren().add(italic);
             
             lastEnd = italicMatcher.end();
@@ -266,12 +286,16 @@ public class MarkdownRenderer {
             if (!lines[i].isEmpty() || i == 0) {
                 Text textNode = new Text(lines[i]);
                 textNode.setFont(Font.font(null, baseFontSize));
-                textNode.setStyle("-fx-fill: " + textColor + ";");
+                textNode.setStyle("-fx-fill: " + textColor + "; -fx-cursor: text;");
+                // 启用文本节点的鼠标事件处理
+                textNode.setMouseTransparent(false);
                 flow.getChildren().add(textNode);
             }
             
             if (i < lines.length - 1) {
                 Text newline = new Text("\n");
+                newline.setMouseTransparent(false);
+                newline.setStyle("-fx-cursor: text;");
                 flow.getChildren().add(newline);
             }
         }

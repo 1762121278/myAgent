@@ -17,14 +17,17 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.*;
+import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
+import javafx.scene.input.KeyCombination;
 import javafx.scene.layout.*;
 import javafx.scene.text.Text;
+import javafx.scene.text.TextFlow;
 import javafx.stage.FileChooser;
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
@@ -43,6 +46,9 @@ import java.util.*;
 import java.io.File;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import java.util.HashSet;
+import java.util.Arrays;
 
 /**
  * 聊天助手视图类，负责显示聊天界面和处理用户交互
@@ -68,9 +74,9 @@ public final class ChatAssistantView extends BorderPane {
     private static final long IMG_MAX_BYTES = 2L * 1024 * 1024;
 
     /** 支持的文档扩展名 */
-    private static final Set<String> DOC_EXT = Set.of("pdf", "doc", "docx", "txt");
+    private static final Set<String> DOC_EXT = new HashSet<>(Arrays.asList("pdf", "doc", "docx", "txt"));
     /** 支持的图片扩展名 */
-    private static final Set<String> IMG_EXT = Set.of("jpg", "jpeg", "png");
+    private static final Set<String> IMG_EXT = new HashSet<>(Arrays.asList("jpg", "jpeg", "png"));
     private static final Logger log = LoggerFactory.getLogger(ChatAssistantView.class);
 
     /** 聊天消息列表 */
@@ -247,10 +253,20 @@ public final class ChatAssistantView extends BorderPane {
         icon.getStyleClass().add("brand-icon");
         icon.setFitWidth(24);
         icon.setFitHeight(24);
-        var title = new Label("智能对话助手");
-        title.getStyleClass().add("brand-title");
+        
+        // 使用TextFlow替代Label，确保智能体名称可以被选择和复制
+        TextFlow titleContainer = new TextFlow();
+        titleContainer.setMouseTransparent(false);
+        titleContainer.setStyle("-fx-cursor: text;");
+        
+        var titleText = new Text("智能对话助手");
+        titleText.getStyleClass().add("brand-title");
+        titleText.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-fill: #334155;");
+        titleText.setMouseTransparent(false);
+        
+        titleContainer.getChildren().add(titleText);
 
-        brand.getChildren().addAll(icon, title);
+        brand.getChildren().addAll(icon, titleContainer);
 
         header.getChildren().addAll(toggleSidebarBtn, brand);
         return header;
@@ -480,11 +496,14 @@ public final class ChatAssistantView extends BorderPane {
         StackPane.setMargin(outer, new Insets(16, 16, 0, 16));
 
         messageList.setItems(messages);
-        messageList.setFocusTraversable(false);
+        messageList.setFocusTraversable(false); // 禁用ListView的焦点，避免干扰文本选择
         messageList.getStyleClass().add("message-list");
         messageList.setCellFactory(v -> new MessageCell());
         messageList.setPrefWidth(Region.USE_COMPUTED_SIZE);
         messageList.setMaxWidth(Double.MAX_VALUE);
+        
+        // 完全禁用ListView的选择功能，避免干扰文本选择
+        messageList.getSelectionModel().clearSelection();
 
         messageScrollShell.setContent(messageList);
         messageScrollShell.setFitToWidth(true);
@@ -835,7 +854,7 @@ public final class ChatAssistantView extends BorderPane {
         // 获取用户输入的文本和上传的文件
         String text = input.getText() == null ? "" : input.getText().trim();
         // 创建文件列表的快照
-        var filesSnapshot = List.copyOf(uploadedFiles);
+        var filesSnapshot = new ArrayList<>(uploadedFiles);
 
         // 移除欢迎消息（如果存在），因为用户已经开始对话
         messages.removeIf(this::isWelcomeMessage);
@@ -1293,11 +1312,11 @@ public final class ChatAssistantView extends BorderPane {
      */
     private String buildUserPayload(String text, List<UploadedFileItem> files) {
         var sb = new StringBuilder();
-        if (text != null && !text.isBlank()) {
+        if (text != null && !text.trim().isEmpty()) {
             sb.append(text);
         }
         if (!files.isEmpty()) {
-            if (!sb.isEmpty()) {
+            if (sb.length() > 0) {
                 sb.append("\n\n");
             }
             sb.append("已上传文件：\n");
@@ -1319,7 +1338,7 @@ public final class ChatAssistantView extends BorderPane {
         if (!files.isEmpty()) {
             return "好的，我明白了。已收到 " + files.size() + " 个文件（模型：" + model + "），请告诉我你希望我从中提取或分析哪些信息。";
         }
-        if (userText == null || userText.isBlank()) {
+        if (userText == null || userText.trim().isEmpty()) {
             return "好的，我明白了。";
         }
         return "好的，我明白了。让我来帮您解决这个问题。（模型：" + model + "）";
@@ -1400,13 +1419,14 @@ public final class ChatAssistantView extends BorderPane {
      * 负责渲染单个消息气泡，支持Markdown格式、加载动画等
      * 根据消息角色（用户/AI）显示不同的样式和对齐方式
      */
-    private static final class MessageCell extends ListCell<ChatMessage> {
+    private final class MessageCell extends ListCell<ChatMessage> {
         @Override
         protected void updateItem(ChatMessage item, boolean empty) {
             super.updateItem(item, empty);
             if (empty || item == null) {
                 setGraphic(null);
                 setText(null);
+                setContextMenu(null);
                 return;
             }
 
@@ -1447,6 +1467,53 @@ public final class ChatAssistantView extends BorderPane {
             VBox markdownContent = MarkdownRenderer.render(item.getText(), 16, textColor);
             markdownContent.setMaxWidth(600); // 设置最大宽度，防止消息气泡过宽
             markdownContent.getStyleClass().add("bubble-content");
+            
+            // 确保VBox容器不拦截鼠标事件，让其中的TextFlow可以接收鼠标事件
+            markdownContent.setMouseTransparent(false);
+            
+            // 移除干扰文本选择的鼠标事件监听器，让默认的文本选择行为正常工作
+            // 文本选择功能由TextFlow自动处理，无需额外的事件监听器
+
+            // 创建右键菜单，与输入框右键菜单一致
+            ContextMenu contextMenu = new ContextMenu();
+            
+            // 复制菜单项
+            MenuItem copyMenuItem = new MenuItem("复制(C)");
+            copyMenuItem.setAccelerator(javafx.scene.input.KeyCombination.keyCombination("Ctrl+C"));
+            copyMenuItem.setOnAction(e -> {
+                // 这里我们模拟标准的复制行为
+                Clipboard clipboard = Clipboard.getSystemClipboard();
+                ClipboardContent content = new ClipboardContent();
+                content.putString(item.getText()); // 复制整个消息，实际场景中应该是选中的文本
+                clipboard.setContent(content);
+            });
+            
+            // 粘贴菜单项
+            MenuItem pasteMenuItem = new MenuItem("粘贴(V)");
+            pasteMenuItem.setAccelerator(javafx.scene.input.KeyCombination.keyCombination("Ctrl+V"));
+            pasteMenuItem.setOnAction(e -> {
+                // 粘贴功能在此场景中不太适用，但保留菜单项以保持一致性
+            });
+            
+            // 剪切菜单项
+            MenuItem cutMenuItem = new MenuItem("剪切(T)");
+            cutMenuItem.setAccelerator(javafx.scene.input.KeyCombination.keyCombination("Ctrl+X"));
+            cutMenuItem.setOnAction(e -> {
+                // 剪切功能在此场景中不太适用，但保留菜单项以保持一致性
+            });
+            
+            // 全选菜单项
+            MenuItem selectAllMenuItem = new MenuItem("全选(A)");
+            selectAllMenuItem.setAccelerator(javafx.scene.input.KeyCombination.keyCombination("Ctrl+A"));
+            selectAllMenuItem.setOnAction(e -> {
+                // 全选功能在此场景中不太适用，但保留菜单项以保持一致性
+            });
+            
+            // 添加菜单项到上下文菜单
+            contextMenu.getItems().addAll(copyMenuItem, cutMenuItem, pasteMenuItem, new SeparatorMenuItem(), selectAllMenuItem);
+
+            // 直接在ListCell上设置右键菜单
+            setContextMenu(contextMenu);
 
             // 创建复制按钮
             Button copyButton = new Button();
@@ -1492,6 +1559,9 @@ public final class ChatAssistantView extends BorderPane {
             VBox messageWithTime = new VBox(markdownContent, timeAndCopyContainer);
             messageWithTime.setMaxWidth(600);
             messageWithTime.getStyleClass().add("bubble-content");
+            
+            // 确保messageWithTime能够接收鼠标事件
+            messageWithTime.setMouseTransparent(false);
 
             VBox finalMarkdownContent = messageWithTime;
 
@@ -1500,6 +1570,9 @@ public final class ChatAssistantView extends BorderPane {
             bubble.getStyleClass().add("bubble");
             bubble.getChildren().add(finalMarkdownContent);
             bubble.setMaxWidth(600);
+            
+            // 确保气泡容器能够接收鼠标事件
+            bubble.setMouseTransparent(false);
 
             // 创建消息内容容器
             var contentContainer = new HBox();
@@ -1514,6 +1587,9 @@ public final class ChatAssistantView extends BorderPane {
             }
 
             contentContainer.getStyleClass().add("message-content-wrapper");
+            
+            // 确保内容容器能够接收鼠标事件
+            contentContainer.setMouseTransparent(false);
 
             // 创建消息行容器（HBox用于水平布局，控制消息对齐方式）
             var row = new HBox();

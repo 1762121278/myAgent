@@ -21,25 +21,35 @@
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <javafx.version>21.0.5</javafx.version>
-        <spring-boot.version>3.3.0</spring-boot.version>
+        <!-- 统一Spring AI版本，避免冲突 -->
+        <spring-boot.version>1.1.0</spring-boot.version>
+        <spring-ai.version>1.1.0</spring-ai.version>
+        <spring-ai-alibaba.version>1.1.0.0-RC2</spring-ai-alibaba.version>
+        <milvus-sdk.version>2.4.4</milvus-sdk.version>
     </properties>
 
     <dependencies>
+        <!-- JavaFX依赖（添加分类器适配不同系统，避免打包后运行报错） -->
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-controls</artifactId>
             <version>${javafx.version}</version>
+            <classifier>${javafx.platform}</classifier>
         </dependency>
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-graphics</artifactId>
             <version>${javafx.version}</version>
+            <classifier>${javafx.platform}</classifier>
         </dependency>
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-base</artifactId>
             <version>${javafx.version}</version>
+            <classifier>${javafx.platform}</classifier>
         </dependency>
+
+        <!-- Spring Boot核心依赖 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter</artifactId>
@@ -48,18 +58,50 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
+
+        <!-- 阿里巴巴Spring AI Agent框架 -->
         <dependency>
             <groupId>com.alibaba.cloud.ai</groupId>
             <artifactId>spring-ai-alibaba-agent-framework</artifactId>
-            <version>1.1.0.0-RC2</version>
+            <version>${spring-ai-alibaba.version}</version>
         </dependency>
 
-        <!-- DashScope ChatModel 支持（如果使用其他模型，请跳转 Spring AI 文档选择对应的 starter） -->
+        <!-- Spring AI Milvus向量存储（版本与核心依赖统一） -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-vector-store-milvus</artifactId>
+            <version>${spring-ai.version}</version>
+        </dependency>
+
+        <!-- Milvus Java SDK（与Spring AI Milvus starter兼容版本） -->
+        <dependency>
+            <groupId>io.milvus</groupId>
+            <artifactId>milvus-sdk-java</artifactId>
+            <version>${milvus-sdk.version}</version>
+        </dependency>
+
+        <!-- Milvus向量存储核心依赖（自动配置关键） -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-vector-store-milvus</artifactId>
+            <version>1.1.0</version>
+        </dependency>
+        <!-- Spring AI核心依赖 -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-core</artifactId>
+            <version>1.0.0-M5</version>
+        </dependency>
+
+        <!-- Spring AI核心依赖（版本统一，避免冲突） -->
+
+        <!-- DashScope（通义千问）AI服务依赖 -->
         <dependency>
             <groupId>com.alibaba.cloud.ai</groupId>
             <artifactId>spring-ai-alibaba-starter-dashscope</artifactId>
-            <version>1.1.0.0-RC2</version>
+            <version>${spring-ai-alibaba.version}</version>
         </dependency>
+
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
@@ -70,9 +112,9 @@
 
     <build>
         <defaultGoal>clean package</defaultGoal>
-        <!--suppress UnresolvedMavenProperty -->
         <finalName>MyChatAssistant</finalName>
         <plugins>
+            <!-- Spring Boot打包插件（替代assembly，更适配Spring Boot） -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
@@ -101,14 +143,14 @@
                 </configuration>
                 <executions>
                     <execution>
-                        <id>make-assembly</id>
-                        <phase>package</phase>
                         <goals>
                             <goal>single</goal>
                         </goals>
                     </execution>
                 </executions>
             </plugin>
+
+            <!-- 编译插件（指定Java版本） -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -121,5 +163,41 @@
             </plugin>
         </plugins>
     </build>
-</project>
 
+    <!-- 配置JavaFX平台分类器（根据运行系统自动选择） -->
+    <profiles>
+        <profile>
+            <id>windows</id>
+            <activation>
+                <os>
+                    <family>Windows</family>
+                </os>
+            </activation>
+            <properties>
+                <javafx.platform>win</javafx.platform>
+            </properties>
+        </profile>
+        <profile>
+            <id>linux</id>
+            <activation>
+                <os>
+                    <family>Linux</family>
+                </os>
+            </activation>
+            <properties>
+                <javafx.platform>linux</javafx.platform>
+            </properties>
+        </profile>
+        <profile>
+            <id>mac</id>
+            <activation>
+                <os>
+                    <family>Mac</family>
+                </os>
+            </activation>
+            <properties>
+                <javafx.platform>mac</javafx.platform>
+            </properties>
+        </profile>
+    </profiles>
+</project>
