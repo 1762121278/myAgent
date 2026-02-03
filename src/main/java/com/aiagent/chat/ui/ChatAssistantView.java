@@ -1,5 +1,6 @@
 package com.aiagent.chat.ui;
 
+import com.aiagent.app.SpringBootApp;
 import com.aiagent.chat.model.ChatMessage;
 import com.aiagent.chat.model.ChatSession;
 import com.aiagent.chat.model.UploadedFileItem;
@@ -135,8 +136,8 @@ public final class ChatAssistantView extends BorderPane {
      * 构建完整的UI布局：顶部标题栏、侧边栏、聊天区域和输入区域
      */
     public ChatAssistantView() {
-        // 初始化会话存储管理器
-        this.sessionStorageManager = new SessionStorageManager();
+        // 初始化会话存储管理器 - 优先从 Spring 上下文获取，否则使用默认配置
+        this.sessionStorageManager = initializeSessionStorageManager();
 
         // 设置页面样式类
         getStyleClass().add("page");
@@ -1771,6 +1772,14 @@ public final class ChatAssistantView extends BorderPane {
         // 从会话列表中移除会话
         sessions.remove(sessionToDelete);
 
+        // 删除本地会话文件
+        if (sessionToDelete != null && sessionToDelete.getId() != null) {
+            boolean deleted = sessionStorageManager.deleteSession(sessionToDelete.getId());
+            if (deleted) {
+                System.out.println("已删除会话及其本地文件: " + sessionToDelete.getTitle());
+            }
+        }
+
         // 如果删除的是当前会话，则清除当前会话
         if (currentSession == sessionToDelete) {
             currentSession = null;
@@ -1779,8 +1788,28 @@ public final class ChatAssistantView extends BorderPane {
             seedWelcome();
         }
 
-        // 保存会话列表到本地
+        // 保存会话列表到本地（更新会话列表文件）
         saveAllSessions();
+    }
+
+    /**
+     * 初始化会话存储管理器
+     * 优先从 Spring 上下文获取，如果不可用则使用默认配置
+     */
+    private SessionStorageManager initializeSessionStorageManager() {
+        try {
+            // 尝试从 Spring 上下文获取 SessionStorageManager
+            if (SpringBootApp.getContext() != null) {
+                SessionStorageManager manager = SpringBootApp.getContext().getBean(SessionStorageManager.class);
+                System.out.println("从 Spring 上下文获取 SessionStorageManager 成功");
+                return manager;
+            }
+        } catch (Exception e) {
+            System.out.println("从 Spring 上下文获取 SessionStorageManager 失败，使用默认配置: " + e.getMessage());
+        }
+        
+        // 使用默认配置创建
+        return new SessionStorageManager();
     }
 }
 

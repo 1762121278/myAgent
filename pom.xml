@@ -69,21 +69,7 @@
         <!-- Spring AI Milvus向量存储（版本与核心依赖统一） -->
         <dependency>
             <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-starter-vector-store-milvus</artifactId>
-            <version>${spring-ai.version}</version>
-        </dependency>
-
-        <!-- Milvus Java SDK（与Spring AI Milvus starter兼容版本） -->
-        <dependency>
-            <groupId>io.milvus</groupId>
-            <artifactId>milvus-sdk-java</artifactId>
-            <version>${milvus-sdk.version}</version>
-        </dependency>
-
-        <!-- Milvus向量存储核心依赖（自动配置关键） -->
-        <dependency>
-            <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-starter-vector-store-milvus</artifactId>
+            <artifactId>spring-ai-milvus-store</artifactId>
             <version>1.1.0</version>
         </dependency>
         <!-- Spring AI核心依赖 -->

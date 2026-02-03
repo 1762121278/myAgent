@@ -5,6 +5,11 @@ import com.aiagent.chat.model.ChatSession;
 import com.aiagent.chat.model.UploadedFileItem;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+
+import jakarta.annotation.PostConstruct;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -22,22 +27,66 @@ import java.util.stream.Collectors;
  * 
  * @author jiangtao.shu
  */
+@Slf4j
+@Component
 public class SessionStorageManager {
     
-    private static final String SESSIONS_DIR = "sessions";
     private static final String SESSION_FILE_EXTENSION = ".session";
     
-    private final Path sessionsDir;
+    @Value("${session-storage-path:${user.home}/.chat-assistant/sessions}")
+    private String storagePath;
+    
+    private Path sessionsDir;
     private final ObjectMapper objectMapper;
     
+    /**
+     * 默认构造函数，使用默认路径
+     */
     public SessionStorageManager() {
-        this.sessionsDir = Paths.get(System.getProperty("user.home"), ".chat-assistant", SESSIONS_DIR);
+        this(null);
+    }
+    
+    /**
+     * 带自定义路径的构造函数
+     * @param customStoragePath 自定义存储路径，为null时使用默认路径
+     */
+    public SessionStorageManager(String customStoragePath) {
         this.objectMapper = new ObjectMapper();
         // 注册JavaTimeModule以支持LocalDateTime序列化
         this.objectMapper.registerModule(new JavaTimeModule());
         
+        // 设置存储路径
+        if (customStoragePath != null && !customStoragePath.isEmpty()) {
+            this.storagePath = customStoragePath;
+        } else {
+            // 使用默认路径
+            this.storagePath = System.getProperty("user.home") + "/.chat-assistant/sessions";
+        }
+        
+        // 立即初始化（非Spring环境）
+        initializeStorage();
+    }
+    
+    @PostConstruct
+    public void init() {
+        // Spring环境初始化，storagePath已通过@Value注入
+        initializeStorage();
+    }
+    
+    /**
+     * 初始化存储目录
+     */
+    private void initializeStorage() {
+        // 解析路径，支持 ${user.home} 等占位符
+        String resolvedPath = storagePath;
+        if (resolvedPath.contains("${user.home}")) {
+            resolvedPath = resolvedPath.replace("${user.home}", System.getProperty("user.home"));
+        }
+        this.sessionsDir = Paths.get(resolvedPath);
+        
         // 确保目录存在
         ensureDirectoriesExist();
+        log.info("会话存储路径: " + sessionsDir.toAbsolutePath());
     }
     
     /**
@@ -49,6 +98,13 @@ public class SessionStorageManager {
         } catch (IOException e) {
             throw new RuntimeException("无法创建会话存储目录: " + e.getMessage(), e);
         }
+    }
+    
+    /**
+     * 获取当前存储路径
+     */
+    public String getStoragePath() {
+        return sessionsDir.toAbsolutePath().toString();
     }
     
     /**
@@ -195,16 +251,22 @@ public class SessionStorageManager {
     }
     
     /**
-     * 删除指定会话
+     * 删除指定会话（同时删除本地文件）
      * 
      * @param sessionId 会话ID
+     * @return 是否成功删除
      */
-    public void deleteSession(String sessionId) {
+    public boolean deleteSession(String sessionId) {
         try {
             Path sessionFile = sessionsDir.resolve(sessionId + SESSION_FILE_EXTENSION);
-            Files.deleteIfExists(sessionFile);
+            boolean deleted = Files.deleteIfExists(sessionFile);
+            if (deleted) {
+                System.out.println("已删除会话文件: " + sessionFile);
+            }
+            return deleted;
         } catch (IOException e) {
-            throw new RuntimeException("删除会话失败: " + e.getMessage(), e);
+            System.err.println("删除会话文件失败: " + e.getMessage());
+            return false;
         }
     }
     
@@ -222,6 +284,7 @@ public class SessionStorageManager {
                     .forEach(path -> {
                         try {
                             Files.delete(path);
+                            System.out.println("已删除会话文件: " + path);
                         } catch (IOException e) {
                             System.err.println("删除会话文件失败: " + path + ", 错误: " + e.getMessage());
                         }

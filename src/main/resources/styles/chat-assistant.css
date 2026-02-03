@@ -41,11 +41,41 @@
     -fx-background-color: transparent;
     -fx-padding: 0;
     -fx-cell-size: -1;
+    -fx-selection-bar: transparent;
+    -fx-selection-bar-non-focused: transparent;
 }
 
 .message-list .list-cell {
     -fx-padding: 4 0 4 0; /* 减少单元格垂直间距 */
     -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-cell-size: -1;
+    -fx-background-radius: 0;
+    -fx-border-width: 0;
+    -fx-border-color: transparent;
+    -fx-selection-bar: transparent;
+    -fx-selection-bar-non-focused: transparent;
+}
+
+.message-list .list-cell:selected {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-selection-bar: transparent;
+    -fx-selection-bar-non-focused: transparent;
+}
+
+.message-list .list-cell:focused {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-selection-bar: transparent;
+    -fx-selection-bar-non-focused: transparent;
+}
+
+.message-list .list-cell:hover {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-selection-bar: transparent;
+    -fx-selection-bar-non-focused: transparent;
 }
 
 .message-list .scroll-bar:vertical {
@@ -110,6 +140,41 @@
 /* Markdown content styles */
 .bubble-content {
     -fx-wrap-text: true;
+    -fx-cursor: text;
+    -fx-user-select: text;
+    -fx-text-fill: inherit;
+}
+
+/* 选中文本样式 */
+.text:selected {
+    -fx-fill: white;
+    -fx-background-color: #4297f9;
+}
+
+.text-flow .text:selected {
+    -fx-fill: white;
+    -fx-background-color: #4297f9;
+}
+
+/* TextFlow选中文本样式 */
+.text-flow {
+    -fx-text-selection-fill: white;
+    -fx-selection-bar: #4297f9;
+    -fx-selection-bar-non-focused: #4297f9;
+    -fx-cursor: text;
+    -fx-user-select: text;
+    -fx-background-color: transparent;
+}
+
+.text-flow .text {
+    -fx-cursor: text;
+    -fx-fill: inherit;
+    -fx-user-select: text;
+}
+
+.text-flow .text:hover {
+    -fx-cursor: text;
+    -fx-user-select: text;
 }
 
 /* Code block styles */

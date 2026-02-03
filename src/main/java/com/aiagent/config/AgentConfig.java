@@ -2,11 +2,15 @@ package com.aiagent.config;
 
 
 import com.aiagent.chat.outputSchema.TextAnalysisResult;
+import com.aiagent.rag.RAGMessagesHook;
 import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions;
 import com.alibaba.cloud.ai.graph.agent.ReactAgent;
 import com.alibaba.cloud.ai.graph.checkpoint.savers.MemorySaver;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.converter.BeanOutputConverter;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import com.alibaba.cloud.ai.dashscope.api.DashScopeApi;
@@ -24,6 +28,10 @@ public class AgentConfig {
 
     @Value("${spring.ai.dashscope.chat.options.model}")
     private String model;
+
+    @Autowired
+    @Qualifier("milvusVectorStore")
+    private VectorStore vectorStore;
 
     @Bean
     public ReactAgent chatBotAgent() {
@@ -74,6 +82,8 @@ public class AgentConfig {
                 //使用 instruction提供详细指令
                 .instruction(instruction)
 //                .outputSchema(responseFormat)
+                .hooks(new RAGMessagesHook(vectorStore))
+
                 .build();
     }
 }
