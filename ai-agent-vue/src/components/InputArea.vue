@@ -1,5 +1,5 @@
 <template>
-  <div class="input-area">
+  <div class="input-area" :class="{ collapsed: isCollapsed }">
     <!-- 已上传文件列表 -->
     <div v-if="uploadedFiles.length > 0" class="files-container">
       <div 
@@ -173,6 +173,22 @@
         <span class="btn-text">{{ loading ? '发送中' : '发送' }}</span>
       </button>
     </div>
+
+    <!-- 收起/展开切换按钮 -->
+    <button class="collapse-toggle" @click="toggleCollapse" :title="isCollapsed ? '展开输入区' : '收起输入区'">
+      <svg v-if="!isCollapsed" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="6 9 12 15 18 9" />
+      </svg>
+      <svg v-else viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="6 15 12 9 18 15" />
+      </svg>
+    </button>
+    <!-- 折叠后显示的浮动恢复按钮，确保用户能在页面任意位置恢复输入区 -->
+    <button v-if="isCollapsed" class="restore-fab" @click="toggleCollapse" title="展开输入区">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="6 15 12 9 18 15"></polyline>
+      </svg>
+    </button>
     
     <!-- 隐藏的文件输入 -->
     <input
@@ -234,6 +250,18 @@ const availableModels = [
 ]
 const modelButtonRef = ref(null)
 const menuStyle = ref({})
+
+// 收起/展开输入区
+const isCollapsed = ref(false)
+const toggleCollapse = () => {
+  isCollapsed.value = !isCollapsed.value
+  // 失焦并收起下拉菜单
+  showModelDropdown.value = false
+  if (!isCollapsed.value) {
+    // 展开时聚焦文本框
+    nextTick(() => textareaRef.value?.focus())
+  }
+}
 
 const onOutsideClick = (e) => {
   const wrapper = modelButtonRef.value
@@ -374,6 +402,34 @@ watch(() => props.loading, (newVal) => {
   border-top: 2px solid #e0f2fe;
   padding: 24px;
   box-shadow: 0 -4px 20px rgba(59, 130, 246, 0.08);
+  position: relative;
+  transition: all 300ms ease;
+}
+
+/* 折叠样式：通过限制内部区域的 max-height 实现平滑收起 */
+.files-container,
+.input-wrapper,
+.toolbar {
+  transition: max-height 300ms ease, opacity 200ms ease, transform 300ms ease;
+  overflow: hidden;
+}
+
+.input-area.collapsed {
+  padding: 6px 24px;
+}
+
+.input-area.collapsed .input-wrapper,
+.input-area.collapsed .toolbar,
+.input-area.collapsed .files-container {
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+}
+
+.input-area.collapsed .input-wrapper,
+.input-area.collapsed .toolbar {
+  margin-bottom: 0;
 }
 
 /* 文件列表 */
@@ -538,6 +594,53 @@ watch(() => props.loading, (newVal) => {
   border-color: #3b82f6;
   box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15), 0 4px 20px rgba(59, 130, 246, 0.1);
 }
+
+/* 收起/展开按钮 */
+.collapse-toggle {
+  position: absolute;
+  right: 18px;
+  top: 12px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  cursor: pointer;
+  transition: transform 180ms ease;
+  z-index: 40;
+}
+
+.collapse-toggle:hover { transform: translateY(-2px); }
+
+.input-area.collapsed .collapse-toggle {
+  background: linear-gradient(135deg,#f8fafc,#ffffff);
+}
+
+/* 折叠后在页面右下角显示的恢复按钮 (Floating Action Button) */
+.restore-fab {
+  position: fixed;
+  right: 28px;
+  bottom: 28px;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+  color: white;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 30px rgba(99,102,241,0.25);
+  cursor: pointer;
+  z-index: 60;
+  transition: transform 160ms ease;
+}
+
+.restore-fab:hover { transform: translateY(-4px); }
 
 .input-textarea::placeholder {
   color: #94a3b8;
