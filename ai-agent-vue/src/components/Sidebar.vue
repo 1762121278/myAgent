@@ -62,7 +62,8 @@
           <div class="menu-text">知识库</div>
           <div class="menu-caret">{{ kbOpen ? '▾' : '▸' }}</div>
         </div>
-        <div v-show="kbOpen" class="kb-submenu">
+        <div v-show="kbOpen" class="kb-submenu" ref="kbSubmenu">
+          <div class="kb-highlight" :style="kbHighlightStyle"></div>
           <router-link class="kb-item" to="/kb/manage">知识库管理</router-link>
           <router-link class="kb-item" to="/kb/dataset">数据集测试</router-link>
           <router-link class="kb-item" to="/kb/dialog">对话应用</router-link>
@@ -75,7 +76,8 @@
 <script setup>
 import { formatTime } from '../stores/chat.js'
 
-import { ref } from 'vue'
+import { ref, onMounted, nextTick, watch, onBeforeUnmount } from 'vue'
+import { useRoute } from 'vue-router'
 
 defineProps({
   visible: {
@@ -96,6 +98,44 @@ defineEmits(['toggle', 'new-session', 'select-session', 'delete-session'])
 
 const historyOpen = ref(true)
 const kbOpen = ref(false)
+
+// 可移动高亮（用于知识库子菜单）
+const kbSubmenu = ref(null)
+const kbHighlightStyle = ref({ opacity: 0 })
+const route = useRoute()
+
+function updateKbHighlight() {
+  nextTick(() => {
+    const container = kbSubmenu.value
+    if (!container) return
+    const activeEl = container.querySelector('.kb-item.router-link-active') || container.querySelector('.kb-item.active')
+    if (activeEl) {
+      const top = activeEl.offsetTop
+      const height = activeEl.offsetHeight
+      kbHighlightStyle.value = {
+        top: top + 'px',
+        height: height + 'px',
+        opacity: 1
+      }
+    } else {
+      kbHighlightStyle.value = { opacity: 0 }
+    }
+  })
+}
+
+onMounted(() => {
+  updateKbHighlight()
+  window.addEventListener('resize', updateKbHighlight)
+  if (kbSubmenu.value) kbSubmenu.value.addEventListener('scroll', updateKbHighlight)
+})
+
+watch(() => route.path, () => updateKbHighlight())
+watch(kbOpen, (v) => { if (v) updateKbHighlight(); else kbHighlightStyle.value = { opacity: 0 } })
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', updateKbHighlight)
+  if (kbSubmenu.value) kbSubmenu.value.removeEventListener('scroll', updateKbHighlight)
+})
 </script>
 
 <style scoped>
@@ -184,27 +224,38 @@ const kbOpen = ref(false)
   transform: translateX(4px);
 }
 
-.session-item.active {
-  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-  border-color: #3b82f6;
-  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.2);
+.session-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* 隐藏滚动条但保留滚动功能 */
+  -ms-overflow-style: none; /* IE 10+ */
+  scrollbar-width: none; /* Firefox */
 }
+.session-list::-webkit-scrollbar { width: 0; height: 0; }
 
-.session-icon {
-  width: 44px;
-  height: 44px;
+.session-item {
   display: flex;
   align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #e0f2fe 0%, #dbeafe 100%);
+  gap: 14px;
+  padding: 14px 16px;
   border-radius: 12px;
-  color: #3b82f6;
-  flex-shrink: 0;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  background: #f3f4f6; /* 未选：浅灰色 */
+  border: 2px solid transparent;
+}
+.session-item:hover {
+  background: #edf2f7; /* 悬停微亮 */
+  transform: translateX(3px);
 }
 
-.session-icon svg {
-  width: 22px;
-  height: 22px;
+.session-item.active {
+  background: linear-gradient(135deg, #eef6ff 0%, #e6f2ff 100%); /* 选中：淡蓝 */
+  border-color: #bfdbfe; /* 淡蓝边框 */
+  box-shadow: 0 6px 18px rgba(59,130,246,0.08);
 }
 
 .session-info {
@@ -317,9 +368,31 @@ const kbOpen = ref(false)
   cursor: pointer;
   color: #374151;
   font-weight: 600;
+  background: #f3f4f6; /* 待选：浅灰 */
 }
 
 .kb-item:hover {
   background: #f8fafc;
+}
+
+/* 可移动高亮背景 */
+.kb-submenu {
+  position: relative;
+}
+.kb-highlight {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: linear-gradient(135deg, rgba(59,130,246,0.12) 0%, rgba(219,234,254,0.6) 100%);
+  border-radius: 10px;
+  transition: top 0.25s ease, height 0.25s ease, opacity 0.2s ease;
+  z-index: 0;
+  pointer-events: none;
+}
+.kb-item { z-index: 1; }
+.kb-item.router-link-active {
+  color: #0f172a;
+  background: linear-gradient(135deg, #eef6ff 0%, #e6f2ff 100%); /* 选中：淡蓝 */
+  border-radius: 10px;
 }
 </style>

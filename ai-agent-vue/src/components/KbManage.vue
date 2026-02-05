@@ -12,14 +12,35 @@
         </div>
       </div>
 
-      <div class="upload-controls">
-        <label class="select-label">选择知识库：</label>
-        <select v-model="selectedKb" class="kb-select">
-          <option v-for="kb in kbList" :key="kb.id" :value="kb.id">{{ kb.title }}</option>
-        </select>
-        <button class="process-btn" @click="startUpload" :disabled="!stagedFiles.length">开始上传处理</button>
-        <div class="staged-info" v-if="stagedFiles.length">已选 {{ stagedFiles.length }} 个文件</div>
-      </div>
+        <div class="upload-controls">
+          <label class="select-label">选择知识库：</label>
+          <select v-model="selectedKb" class="kb-select">
+            <option v-for="kb in kbList" :key="kb.id" :value="kb.id">{{ kb.title }}</option>
+          </select>
+          <button class="process-btn" @click="startUpload" :disabled="!stagedFiles.length">开始上传处理</button>
+          <div class="staged-info" v-if="stagedFiles.length">已选 {{ stagedFiles.length }} 个文件</div>
+        </div>
+
+        <!-- 已选文件列表 -->
+        <div class="staged-list" v-if="stagedFiles.length">
+          <div class="staged-item" v-for="(s, idx) in stagedFiles" :key="s.file.name + s.file.size">
+            <div class="staged-meta">
+              <div class="file-name">{{ s.file.name }}</div>
+              <div class="file-size">{{ humanSize(s.file.size) }}</div>
+            </div>
+            <div class="staged-actions">
+              <div class="progress-bar">
+                <div
+                  class="progress"
+                  :class="{ ready: s.status === 'ready', error: s.status === 'error', done: s.status === 'done', uploading: s.status === 'uploading' }"
+                  :style="{ width: (s.status === 'ready' ? '100%' : (s.progress || 0) + '%') }"
+                ></div>
+              </div>
+              <div class="status">{{ s.status }}</div>
+              <button class="btn ghost" @click="removeStaged(idx)" v-if="s.status !== 'uploading'">移除</button>
+            </div>
+          </div>
+        </div>
     </section>
 
     <!-- 知识库列表 -->
@@ -50,7 +71,7 @@
 <script setup>
 import { ref } from 'vue'
 
-const stagedFiles = ref([])
+const stagedFiles = ref([]) // 每项: { file: File, progress: Number, status: 'ready'|'uploading'|'done'|'error' }
 const selectedKb = ref(null)
 
 const kbList = ref([
@@ -67,27 +88,70 @@ const chooseFiles = () => {
   inp.type = 'file'
   inp.multiple = true
   inp.accept = '.pdf,.doc,.docx,.txt,.jpg,.jpeg,.png'
-  inp.onchange = (e) => { stagedFiles.value = [...e.target.files] }
+  inp.onchange = (e) => { 
+    const files = Array.from(e.target.files || [])
+    stagedFiles.value = files.map(f => ({ file: f, progress: 0, status: 'ready' }))
+  }
   inp.click()
 }
 
 const handleDrop = (e) => {
   const files = Array.from(e.dataTransfer.files || [])
-  stagedFiles.value = files
+  stagedFiles.value = files.map(f => ({ file: f, progress: 0, status: 'ready' }))
 }
 
-const startUpload = () => {
+const uploadSingle = (s) => {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    const url = '/rag/upload'
+    const fd = new FormData()
+    fd.append('file', s.file)
+
+    xhr.open('POST', url)
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        s.progress = Math.round((e.loaded / e.total) * 100)
+      }
+    }
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        s.status = 'done'
+        try {
+          const res = JSON.parse(xhr.responseText)
+          resolve(res)
+        } catch (e) {
+          resolve({})
+        }
+      } else {
+        s.status = 'error'
+        reject(new Error('上传失败: ' + xhr.status))
+      }
+    }
+    xhr.onerror = () => { s.status = 'error'; reject(new Error('网络错误')) }
+    s.status = 'uploading'
+    xhr.send(fd)
+  })
+}
+
+const startUpload = async () => {
   if (!stagedFiles.value.length) return
-  // 模拟上传过程：把文件数量累加到所选知识库的 docs
   const kb = kbList.value.find(k => k.id === selectedKb.value)
   if (kb) {
-    kb.docs += stagedFiles.value.length
-    kb.indexed = false
     kb.status = 'building'
-    // 模拟索引耗时
-    setTimeout(() => { kb.indexed = true; kb.status = 'active' }, 1800 + Math.random()*2200)
+    kb.indexed = false
   }
-  stagedFiles.value = []
+  for (const s of stagedFiles.value) {
+    try {
+      await uploadSingle(s)
+      if (kb) kb.docs += 1
+    } catch (e) {
+      console.error('上传失败', e)
+    }
+  }
+  // 模拟后端索引完成后切换状态
+  if (kb) setTimeout(() => { kb.indexed = true; kb.status = 'active' }, 800 + Math.random() * 1600)
+  // 清除已完成或出错的项（可按需保留）
+  stagedFiles.value = stagedFiles.value.filter(s => s.status === 'uploading')
 }
 
 const statusText = (s) => {
@@ -101,6 +165,17 @@ const openManage = (id) => {
   alert('打开知识库管理：' + id)
 }
 
+const removeStaged = (idx) => {
+  stagedFiles.value.splice(idx, 1)
+}
+
+const humanSize = (n) => {
+  if (!n) return ''
+  if (n < 1024) return n + ' B'
+  if (n < 1024*1024) return Math.round(n/1024) + ' KB'
+  return (n / (1024*1024)).toFixed(1) + ' MB'
+}
+
 const testKb = (id) => {
   alert('跳转到数据集测试 / 对话应用的集成页面（示例），知识库：' + id)
 }
@@ -112,6 +187,7 @@ const removeKb = (id) => {
 </script>
 
 <style scoped>
+.page { padding: 24px; }
 .page-title { font-size: 22px; font-weight: 800; color: #1e3a8a; margin-bottom: 18px }
 
 .upload-panel { background: linear-gradient(180deg,#fff 0,#fbfdff 100%); padding: 18px; border-radius: 14px; box-shadow: 0 6px 20px rgba(16,24,40,0.04); margin-bottom: 22px }
@@ -126,6 +202,20 @@ const removeKb = (id) => {
 .process-btn { background:#2563eb; color:#fff; border:none; padding:8px 14px; border-radius:10px; cursor:pointer }
 .process-btn:disabled { background:#cbd5e1; cursor:not-allowed }
 .staged-info { color:#334155; font-weight:600 }
+
+.staged-list { margin-top:12px; display:flex; flex-direction:column; gap:8px }
+.staged-item { display:flex; align-items:center; justify-content:space-between; gap:12px; background:#fff; padding:10px; border-radius:10px; box-shadow:0 6px 18px rgba(15,23,42,0.03) }
+.staged-meta { display:flex; gap:12px; align-items:center }
+.file-name { font-weight:700; color:#0f172a }
+.file-size { font-size:12px; color:#64748b }
+.staged-actions { display:flex; align-items:center; gap:12px }
+.progress-bar { width:160px; height:8px; background:#f1f5f9; border-radius:8px; overflow:hidden }
+.progress { height:100%; background:linear-gradient(90deg,#60a5fa,#3b82f6); width:0 }
+.progress.ready { background: linear-gradient(90deg,#34d399,#10b981) }
+.progress.done { background: linear-gradient(90deg,#34d399,#10b981) }
+.progress.error { background: #e5e7eb }
+.progress.uploading { background: linear-gradient(90deg,#60a5fa,#3b82f6) }
+.status { font-size:12px; color:#334155; min-width:48px; text-align:center }
 
 .kb-list { margin-top: 10px }
 .section-title { font-size:18px; color:#1e293b; margin-bottom:12px }

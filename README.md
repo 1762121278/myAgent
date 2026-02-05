@@ -2,7 +2,7 @@
 
 ## 运行
 
-本项目使用 **Java 17 + JavaFX 21**。
+本项目使用 **Java 21 + JavaFX 21**。
 
 ### Maven 运行
 
@@ -45,4 +45,18 @@ mvn javafx:run
 - 文件上传：前端校验类型与大小（文档 5MB、图片 2MB），显示文件列表并可删除
 - 对话：发送后立即出现用户气泡；AI 回复延迟 1 秒；自动滚动到底部
 - 响应式：窗口宽度 < 768 时，发送按钮全宽显示
+
+Jdk 21
+node -v v20.12.0
+springboot 
+| vue | ^3.4.21 | 核心框架 |
+| marked | ^12.0.0 | Markdown解析 |
+| marked-highlight | ^2.1.0 | Markdown代码高亮 |
+| highlight.js | ^11.9.0 | 语法高亮 |
+"@vitejs/plugin-vue": "^5.0.4",
+"vite": "^5.2.8"
+spring-ai 1.1.0
+spring-ai-alibaba 1.1.0.0-RC2
+milvus 2.4.4
+
 

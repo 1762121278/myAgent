@@ -19,6 +19,10 @@ export default defineConfig({
       '/aiAgent': {
         target: 'http://localhost:8090',
         changeOrigin: true
+      },
+      '/rag': {
+        target: 'http://localhost:8090',
+        changeOrigin: true
       }
     }
   }

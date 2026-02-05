@@ -1,31 +1,27 @@
 <template>
   <div class="chat-area" ref="chatContainer">
     <div class="messages-wrapper">
-      <div 
-        v-for="(message, index) in messages" 
+      <div
+        v-for="(message, index) in messages"
         :key="index"
         class="message-row"
         :class="message.role.toLowerCase()"
       >
-        <div v-if="message.role.toLowerCase() === 'ai'" class="avatar ai" title="AI">🤖</div>
+        <!-- 头像（非卡通简洁标识） -->
+        <div v-if="message.role.toLowerCase() === 'ai'" class="avatar ai" title="AI"><span class="avatar-label">AI</span></div>
+
         <div class="message-bubble">
           <div class="message-content">
-            <div 
-              v-if="message.text === 'loading'"
-              class="loading-message"
-            >
+            <div v-if="message.text === 'loading'" class="loading-message">
               <div class="loading-spinner"></div>
               <span class="loading-text">正在思考中...</span>
             </div>
-            <div 
-              v-else
-              class="markdown-content"
-              v-html="renderMarkdown(message.text)"
-            ></div>
+            <div v-else class="markdown-content" v-html="renderMarkdown(message.text)"></div>
           </div>
+
           <div class="message-footer">
             <span class="message-time">{{ formatTime(message.createdAt) }}</span>
-            <button 
+            <button
               v-if="message.text !== 'loading'"
               class="copy-btn"
               @click="copyMessage(message.text, index)"
@@ -41,14 +37,27 @@
             </button>
           </div>
         </div>
-        <div v-if="message.role.toLowerCase() === 'user'" class="avatar user" title="You">🧑</div>
+
+        <div v-if="message.role.toLowerCase() === 'user'" class="avatar user" title="You"><span class="avatar-label">你</span></div>
+      </div>
+
+      <!-- 居中微妙的 AI 加载标识（当 AI 返回 loading 占位消息时显示） -->
+      <div v-if="isAiLoading" class="ai-loading-center">
+        <div class="ai-loading-badge">AI 正在思考...</div>
       </div>
     </div>
+
+    <!-- 悬浮到最新按钮（固定在视口，始终可见） -->
+    <button v-show="showScrollBtn" class="scroll-to-bottom-btn" @click.prevent="scrollToBottom()" title="跳到最新消息">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="6 9 12 15 18 9" />
+      </svg>
+    </button>
   </div>
 </template>
 
 <script setup>
-import { ref, watch, nextTick } from 'vue'
+import { ref, watch, nextTick, computed, onMounted, onBeforeUnmount } from 'vue'
 import { renderMarkdown } from '../utils/markdown.js'
 import { formatTime } from '../stores/chat.js'
 
@@ -65,6 +74,13 @@ const props = defineProps({
 
 const chatContainer = ref(null)
 const copiedIndex = ref(-1)
+const isAtBottom = ref(true)
+const showScrollBtn = ref(false)
+
+// 是否存在 AI 正在思考的占位消息
+const isAiLoading = computed(() => {
+  return props.messages.some(m => (String(m.role).toUpperCase() === 'AI' || String(m.role).toLowerCase()==='ai') && m.text === 'loading')
+})
 
 // 复制消息
 const copyMessage = async (text, index) => {
@@ -79,17 +95,50 @@ const copyMessage = async (text, index) => {
   }
 }
 
-// 滚动到底部
-const scrollToBottom = () => {
+// 平滑滚动到底部（并重置用户滚动状态）
+const scrollToBottom = (smooth = true) => {
   nextTick(() => {
-    if (chatContainer.value) {
-      chatContainer.value.scrollTop = chatContainer.value.scrollHeight
+    if (!chatContainer.value) return
+    const el = chatContainer.value
+    if (smooth && 'scrollTo' in el) {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+    } else {
+      el.scrollTop = el.scrollHeight
     }
+    // 视为已回到底部
+    isAtBottom.value = true
+    showScrollBtn.value = false
   })
 }
 
-// 监听消息变化，自动滚动
-watch(() => props.messages, scrollToBottom, { deep: true })
+// 监听消息变化，只有当用户在底部（或接近底部）时才自动滚动，避免打断历史查看
+watch(() => props.messages, () => {
+  if (isAtBottom.value) scrollToBottom(true)
+}, { deep: true })
+
+// 监听滚动以判断是否在底部，控制浮动按钮显示
+const onScroll = () => {
+  const el = chatContainer.value
+  if (!el) return
+  const threshold = 120 // px
+  const atBottom = (el.scrollHeight - el.scrollTop - el.clientHeight) <= threshold
+  isAtBottom.value = atBottom
+  showScrollBtn.value = !atBottom
+}
+
+onMounted(() => {
+  nextTick(() => {
+    if (chatContainer.value) {
+      chatContainer.value.addEventListener('scroll', onScroll, { passive: true })
+      // 初始化按钮显示
+      onScroll()
+    }
+  })
+})
+
+onBeforeUnmount(() => {
+  if (chatContainer.value) chatContainer.value.removeEventListener('scroll', onScroll)
+})
 </script>
 
 <style scoped>
@@ -98,6 +147,7 @@ watch(() => props.messages, scrollToBottom, { deep: true })
   overflow-y: auto;
   padding: 24px 20px 24px 24px;
   background: linear-gradient(180deg, #f0f9ff 0%, #e0f2fe 100%);
+  position: relative;
 }
 
 .messages-wrapper {
@@ -106,6 +156,7 @@ watch(() => props.messages, scrollToBottom, { deep: true })
   display: flex;
   flex-direction: column;
   gap: 24px;
+  position: relative; /* 使内部绝对定位相对于消息区域 */
 }
 
 .message-row {
@@ -144,21 +195,29 @@ watch(() => props.messages, scrollToBottom, { deep: true })
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 20px;
+  font-size: 16px;
   flex-shrink: 0;
   box-shadow: 0 2px 8px rgba(16,24,40,0.08);
 }
 
 .avatar.ai {
-  background: linear-gradient(135deg, #60a5fa 0%, #4f46e5 100%);
-  color: #fff;
+  background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+  color: #1e293b;
   margin-right: 12px;
+  border: 1px solid rgba(99,102,241,0.12);
 }
 
 .avatar.user {
-  background: linear-gradient(135deg, #7c3aed 0%, #3b82f6 100%);
-  color: #fff;
+  background: linear-gradient(135deg, #fff7ed 0%, #fff1f2 100%);
+  color: #1e293b;
   margin-left: 12px;
+  border: 1px solid rgba(249,115,22,0.08);
+}
+
+.avatar-label {
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 1;
 }
 
 .message-bubble {
@@ -246,6 +305,50 @@ watch(() => props.messages, scrollToBottom, { deep: true })
 
 .message-row.ai .copy-btn:hover {
   background: #e2e8f0;
+}
+
+/* 悬浮跳转到最新消息按钮 */
+.scroll-to-bottom-btn {
+  /* 固定在视口中间右侧，始终可见（不随消息滚动消失） */
+  position: fixed;
+  right: 24px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 20px rgba(2,6,23,0.08);
+  cursor: pointer;
+  z-index: 160;
+  transition: transform 160ms ease, opacity 160ms ease;
+}
+.scroll-to-bottom-btn:hover { transform: translateY(-4px); }
+
+/* AI 居中加载标识，尽量不显眼 */
+.ai-loading-center {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 40;
+}
+.ai-loading-badge {
+  background: rgba(99,102,241,0.06);
+  color: #334155;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  box-shadow: 0 4px 20px rgba(2,6,23,0.03);
+  opacity: 0.95;
 }
 
 /* 加载动画 */

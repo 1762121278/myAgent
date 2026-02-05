@@ -43,16 +43,16 @@ defineEmits(['toggle-sidebar'])
 .header {
   display: flex;
   align-items: center;
-  gap: 20px;
-  padding: 16px 24px;
+  gap: 16px;
+  padding: 10px 16px; /* 减小高度 */
   background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%);
   border-bottom: 2px solid #e0f2fe;
-  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.1);
+  box-shadow: 0 2px 12px rgba(59, 130, 246, 0.08);
 }
 
 .toggle-btn {
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -61,7 +61,7 @@ defineEmits(['toggle-sidebar'])
   border-radius: 12px;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 3px 12px rgba(59, 130, 246, 0.25);
 }
 
 .toggle-btn:hover {
@@ -70,15 +70,15 @@ defineEmits(['toggle-sidebar'])
 }
 
 .toggle-btn .icon {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   color: white;
 }
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   flex: 1;
 }
 
@@ -87,20 +87,20 @@ defineEmits(['toggle-sidebar'])
 }
 
 .brand-icon {
-  width: 52px;
-  height: 52px;
-  border-radius: 16px;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
   object-fit: cover;
-  border: 3px solid #3b82f6;
-  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+  border: 2px solid #3b82f6;
+  box-shadow: 0 3px 12px rgba(59, 130, 246, 0.25);
 }
 
 .status-dot {
   position: absolute;
   bottom: 2px;
   right: 2px;
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   background: #10b981;
   border-radius: 50%;
   border: 2px solid white;
@@ -113,7 +113,7 @@ defineEmits(['toggle-sidebar'])
 }
 
 .brand-title {
-  font-size: 24px;
+  font-size: 18px;
   font-weight: 700;
   color: #1e40af;
   margin: 0;
@@ -124,10 +124,10 @@ defineEmits(['toggle-sidebar'])
 }
 
 .brand-subtitle {
-  font-size: 13px;
+  font-size: 12px;
   color: #64748b;
   font-weight: 500;
-  letter-spacing: 1px;
+  letter-spacing: 0.6px;
 }
 
 .header-actions {
@@ -136,8 +136,8 @@ defineEmits(['toggle-sidebar'])
 }
 
 .action-btn {
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -155,8 +155,8 @@ defineEmits(['toggle-sidebar'])
 }
 
 .action-btn .icon {
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
   color: #3b82f6;
 }
 </style>

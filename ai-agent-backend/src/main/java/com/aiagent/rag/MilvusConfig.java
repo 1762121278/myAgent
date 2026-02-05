@@ -93,7 +93,7 @@ public class MilvusConfig {
         // 调用 client 创建集合
         MilvusVectorStore vectorStore = MilvusVectorStore.builder(milvusClient, embeddingModel)
                 .databaseName(databaseName)
-                .collectionName(collectionName)
+//                .collectionName(collectionName)
                 .embeddingDimension(embeddingDimension)
                 .initializeSchema(true)
                 .build();

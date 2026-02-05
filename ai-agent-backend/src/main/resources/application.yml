@@ -2,6 +2,19 @@ server:
   port: 8090
 spring:
   ai:
+    dashscope:
+      api-key: sk-f9ca25f37aa249f9a67feaf36113ab34
+      chat:
+        options:
+          enable-search: false   # 关闭联网搜索，仅用RAG上下文
+          model: deepseek-v3.2
+#          model: glm-4.7
+#          model: qianwen-v3.2
+      embedding:
+        options:
+          # Dashscope Embedding模型
+          model: text-embedding-v3
+
     # Milvus 向量数据库配置
     vectorstore:
       milvus:
@@ -15,15 +28,6 @@ spring:
         embeddingDimension: 1024
         indexType: IVF_FLAT
         metricType: COSINE
-
-    dashscope:
-      api-key: sk-f9ca25f37aa249f9a67feaf36113ab34
-      chat:
-        options:
-          model: deepseek-v3.2
-#          model: glm-4.7
-#          model: qianwen-v3.2
-
 
 # 会话存储路径配置，默认使用用户主目录下的 .chat-assistant/sessions
 session-storage-path: D:\sessions

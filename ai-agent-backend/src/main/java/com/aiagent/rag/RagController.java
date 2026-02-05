@@ -1,13 +1,20 @@
 package com.aiagent.rag;
 
-import jakarta.annotation.Resource;
+import com.alibaba.fastjson.JSON;
 import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
+import org.springframework.ai.reader.TextReader;
+import org.springframework.ai.transformer.splitter.TokenTextSplitter;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.milvus.MilvusVectorStore;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -21,6 +28,7 @@ import java.util.UUID;
  *
  * @author jiangtao.shu
  */
+@Slf4j
 @RestController
 @RequestMapping("/rag")
 public class RagController {
@@ -39,11 +47,12 @@ public class RagController {
      */
     @PostMapping(value = "/upload", consumes = {"multipart/form-data"})
     public ResponseEntity<Map<String, Object>> uploadFile(
-            @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+            @RequestParam("file") MultipartFile file) {
 
         Map<String, Object> response = new HashMap<>(2);
 
         try {
+            log.info("文件上传开始!fileName:{}", file.getOriginalFilename());
             // 验证文件类型
             String fileName = file.getOriginalFilename();
             if (fileName == null || !isValidFileType(fileName)) {
@@ -59,8 +68,15 @@ public class RagController {
             // 创建文档对象
             Document document = new Document(content, Map.of("filename", fileName));
 
+            // 2. 分割文档为块
+            TokenTextSplitter splitter = new TokenTextSplitter();
+            List<Document> chunks = splitter.apply(List.of(document));
+
+            // 3. 将块添加到向量存储
+            vectorStore.add(chunks);
+
             // 直接添加到向量存储
-            vectorStore.add(List.of(document));
+//            vectorStore.add(List.of(document));
 
             // 生成文件ID并存储文件信息
             String fileId = UUID.randomUUID().toString();
@@ -70,10 +86,11 @@ public class RagController {
             response.put("success", true);
             response.put("message", "文件上传成功");
             response.put("fileInfo", fileInfo);
-
+            log.info("文件上传完成!");
         } catch (IOException e) {
             response.put("success", false);
             response.put("message", "文件上传失败: " + e.getMessage());
+            log.error("文件上传完成!");
             return ResponseEntity.status(500).body(response);
         }
 
@@ -149,7 +166,8 @@ public class RagController {
         return lowerCaseName.endsWith(".txt") ||
                lowerCaseName.endsWith(".pdf") ||
                lowerCaseName.endsWith(".doc") ||
-               lowerCaseName.endsWith(".docx");
+               lowerCaseName.endsWith(".docx") ||
+               lowerCaseName.endsWith(".png");
     }
 
     /**
