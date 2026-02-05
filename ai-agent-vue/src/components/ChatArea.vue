@@ -183,7 +183,7 @@ watch(() => props.messages, scrollToBottom, { deep: true })
 }
 
 .message-content {
-  font-size: 22px;
+  font-size: 26px;
   line-height: 1.8;
   word-wrap: break-word;
 }
@@ -313,12 +313,13 @@ watch(() => props.messages, scrollToBottom, { deep: true })
 }
 
 :deep(.markdown-content pre) {
-  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  /* 使用浅灰色背景以提高整体视觉舒适度 */
+  background: #f3f4f6;
   border-radius: 12px;
-  padding: 20px;
+  padding: 18px;
   overflow-x: auto;
   margin: 16px 0;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
 }
 
 :deep(.markdown-content code) {
@@ -327,9 +328,33 @@ watch(() => props.messages, scrollToBottom, { deep: true })
 }
 
 :deep(.markdown-content pre code) {
-  color: #e2e8f0;
+  color: #0f172a; /* 深色文本，适配浅灰背景 */
   background: transparent;
   padding: 0;
+}
+
+/* 提高深色代码块中所有语法高亮颜色的可读性：
+   - 统一主色为浅灰白，保证对比
+   - 对内层 token 元素采用继承并加上轻微文字阴影以增强在深色背景下的可见性
+   - 如果希望保留多彩语法高亮，可调整下面的颜色映射或去掉 "color: inherit !important" 规则
+*/
+/* 为浅背景设置合适的 token 基准颜色（保留多彩语法高亮的可能性） */
+:deep(.markdown-content pre) .hljs-keyword,
+:deep(.markdown-content pre) .hljs-built_in,
+:deep(.markdown-content pre) .hljs-title,
+:deep(.markdown-content pre) .token.keyword,
+:deep(.markdown-content pre) .token.function {
+  color: #1e40af !important; /* 深蓝，用于关键词/函数，便于阅读 */
+}
+
+/* 高亮姓名：彩色渐变文字效果 */
+:deep(.markdown-content .highlight-name) {
+  display: inline-block;
+  font-weight: 700;
+  background: linear-gradient(90deg, #f97316, #ef4444, #8b5cf6);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 :deep(.markdown-content :not(pre) code) {

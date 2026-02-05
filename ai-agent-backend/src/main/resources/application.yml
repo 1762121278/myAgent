@@ -20,8 +20,8 @@ spring:
       api-key: sk-f9ca25f37aa249f9a67feaf36113ab34
       chat:
         options:
-#          model: deepseek-v3.2
-          model: glm-4.7
+          model: deepseek-v3.2
+#          model: glm-4.7
 #          model: qianwen-v3.2
 
 

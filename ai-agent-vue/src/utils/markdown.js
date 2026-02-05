@@ -93,7 +93,9 @@ marked.use({ renderer })
 export const renderMarkdown = (text) => {
   if (!text) return ''
   try {
-    return marked.parse(text)
+    // 将特定姓名用 span 包裹，便于前端用样式高亮（例如：李敏）
+    const safeText = String(text).replace(/李敏/g, '<span class="highlight-name">李敏</span>')
+    return marked.parse(safeText)
   } catch (e) {
     console.error('Markdown渲染失败:', e)
     return text

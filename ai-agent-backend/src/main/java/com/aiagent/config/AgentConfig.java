@@ -33,6 +33,12 @@ public class AgentConfig {
     @Qualifier("milvusVectorStore")
     private VectorStore vectorStore;
 
+    /**
+     * 已接入大模型如下：
+     * model: deepseek-v3.2
+     * model: glm-4.7
+     * model: qianwen-v3.2
+     */
     @Bean
     public ReactAgent chatBotAgent() {
         // 创建 DashScope API 实例
@@ -82,7 +88,7 @@ public class AgentConfig {
                 //使用 instruction提供详细指令
                 .instruction(instruction)
 //                .outputSchema(responseFormat)
-//                .hooks(new RAGMessagesHook(vectorStore))
+                .hooks(new RAGMessagesHook(vectorStore))
 
                 .build();
     }
