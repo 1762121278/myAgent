@@ -113,39 +113,6 @@
                     <workingDirectory>../ai-agent-vue</workingDirectory>
                     <installDirectory>target</installDirectory>
                 </configuration>
-                <executions>
-                    <!-- 安装Node和npm -->
-                    <execution>
-                        <id>install-node-and-npm</id>
-                        <goals>
-                            <goal>install-node-and-npm</goal>
-                        </goals>
-                        <configuration>
-                            <nodeVersion>${node.version}</nodeVersion>
-                            <npmVersion>${npm.version}</npmVersion>
-                        </configuration>
-                    </execution>
-                    <!-- 安装npm依赖 -->
-                    <execution>
-                        <id>npm-install</id>
-                        <goals>
-                            <goal>npm</goal>
-                        </goals>
-                        <configuration>
-                            <arguments>install</arguments>
-                        </configuration>
-                    </execution>
-                    <!-- 构建Vue项目 -->
-                    <execution>
-                        <id>npm-run-build</id>
-                        <goals>
-                            <goal>npm</goal>
-                        </goals>
-                        <configuration>
-                            <arguments>run build</arguments>
-                        </configuration>
-                    </execution>
-                </executions>
             </plugin>
 
             <!-- 复制前端构建结果到static目录 -->

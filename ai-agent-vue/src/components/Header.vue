@@ -8,11 +8,11 @@
     
     <div class="brand">
       <div class="logo-wrapper">
-        <img src="/icons/airobot.jpg" alt="江澜" class="brand-icon">
+        <img src="/icons/airobot.jpg" alt="澜" class="brand-icon">
         <div class="status-dot"></div>
       </div>
       <div class="brand-text">
-        <h1 class="brand-title">江澜</h1>
+        <h1 class="brand-title">澜</h1>
         <span class="brand-subtitle">智能助手</span>
       </div>
     </div>

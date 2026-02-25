@@ -2,12 +2,18 @@ server:
   port: 8090
 spring:
   ai:
+    chat:
+      client:
+        enabled: false
     dashscope:
       api-key: sk-f9ca25f37aa249f9a67feaf36113ab34
       chat:
         options:
           enable-search: false   # 关闭联网搜索，仅用RAG上下文
-          model: deepseek-v3.2
+          model: qwen3-omni-flash-realtime
+#          model: qwen-vl-max
+#          model: qwen3-vl-plus
+#          model: deepseek-v3.2
 #          model: glm-4.7
 #          model: qianwen-v3.2
       embedding:

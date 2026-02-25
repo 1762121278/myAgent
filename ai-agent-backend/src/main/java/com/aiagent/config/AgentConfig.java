@@ -7,6 +7,8 @@ import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions;
 import com.alibaba.cloud.ai.graph.agent.ReactAgent;
 import com.alibaba.cloud.ai.graph.checkpoint.savers.MemorySaver;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +18,8 @@ import org.springframework.context.annotation.Bean;
 import com.alibaba.cloud.ai.dashscope.api.DashScopeApi;
 import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatModel;
 import org.springframework.stereotype.Component;
+
+import static com.alibaba.cloud.ai.dashscope.video.DashScopeVideoOptions.DEFAULT_MODEL;
 
 /**
  * @author jiangtao.shu
@@ -32,6 +36,10 @@ public class AgentConfig {
     @Autowired
     @Qualifier("milvusVectorStore")
     private VectorStore vectorStore;
+
+    @Value("${session-storage-path:${user.home}/.chat-assistant/sessions}")
+    private String fileMemory;
+
 
     /**
      * 已接入大模型如下：
@@ -52,11 +60,28 @@ public class AgentConfig {
                 .defaultOptions(DashScopeChatOptions.builder()
                         //指定模型名称
                         .model(model)
+                        .multiModel(true)
                         .build())
                 .build();
 
         //创建大模型系统提示基础配置
+        /**
+
         String systemPrompt = "你是一名专业的运维助手。请准确、简洁地回答问题。";
+
+        //使用 instruction提供详细指令
+        String instruction = """
+                         你是一个经验丰富的软件运维师。在回答问题时，请：\
+                          1. 首先理解用户的核心需求\
+                          2. 分析可能的技术方案\
+                          3. 提供清晰的建议和理由\
+                          4. 如果需要更多信息，主动询问\
+                          保持专业、友好的语气。\
+                        """;
+         *
+         */
+
+        String systemPrompt = "你叫澜，是舒江涛的专业的开发助手、生活助手。你是他最好的伙伴。请准确、简洁地回答问题。";
 
         //使用 instruction提供详细指令
         String instruction = """
@@ -78,10 +103,11 @@ public class AgentConfig {
         //                .name("运维助手")
         //                .saver(new MemorySaver())
 
-        // 创建 Agent
+
         return ReactAgent.builder()
                 .name("运维助手")
                 .saver(new MemorySaver())
+//                .saver(new FileSaver(fileMemory))
                 .model(chatModel)
                 //系统提示基础配置
                 .systemPrompt(systemPrompt)

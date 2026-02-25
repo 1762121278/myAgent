@@ -7,6 +7,7 @@ import com.alibaba.cloud.ai.graph.agent.hook.HookPosition;
 import com.alibaba.cloud.ai.graph.agent.hook.HookPositions;
 import com.alibaba.cloud.ai.graph.RunnableConfig;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.content.Media;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -68,7 +69,8 @@ public class RAGMessagesHook extends MessagesModelHook {
             );
         } catch (Exception e) {
             log.error("检索失败: {}", e.getMessage());
-            return new AgentCommand(previousMessages); // 失败时返回原消息
+            // 失败时返回原消息
+            return new AgentCommand(previousMessages);
         }
 
         // 如果没有检索到文档，直接返回原消息
@@ -76,14 +78,47 @@ public class RAGMessagesHook extends MessagesModelHook {
             return new AgentCommand(previousMessages);
         }
 
-        // 5. 构建上下文字符串（优化格式）
+        // 7. 构建上下文字符串（优化格式）
         String context = buildContext(relevantDocs);
 
-        // 6. 构建新的消息列表
+        // 8. 构建新的消息列表
         List<Message> modifiedMessages = buildMessagesWithContext(previousMessages, context, userQuestion);
 
-        // 7. 替换原消息
+        // 9. 替换原消息
         return new AgentCommand(modifiedMessages, UpdatePolicy.REPLACE);
+    }
+
+    /**
+     * 提取消息中的文件内容
+     * @param messages 用户消息
+     * @param content 检索内容
+     */
+    private void extractFileContent(List<Message> messages, StringBuilder content) {
+        for (Message msg : messages) {
+            if (msg instanceof UserMessage userMsg) {
+                // 1. 检查是否有 Media 对象
+                List<Media> mediaList = userMsg.getMedia();
+                if (mediaList != null && !mediaList.isEmpty()) {
+                    for (Media media : mediaList) {
+                        // 提取媒体内容（如果有）
+                        // 注意：这里需要根据实际的 Media 实现来提取内容
+                        // 例如，如果 Media 包含文件路径或内容，可以在这里处理
+                        log.debug("发现媒体文件: {}", media);
+                        // 暂时添加媒体文件信息到检索内容中
+                        content.append("\n[媒体文件]");
+                    }
+                }
+                
+                // 2. 检查消息文本中是否包含文件上传信息（流式接口的情况）
+                String messageText = userMsg.getText();
+                if (messageText != null && (messageText.contains("[Uploaded files]") || messageText.contains("[多模态文件上传]"))) {
+                    log.debug("发现文件上传信息在消息文本中");
+                    // 这里可以选择是否将文件信息添加到检索内容中
+                    // 由于流式接口已经将文件信息添加到了 input 中，
+                    // 而 input 已经被作为 userQuestion 提取，所以这里可以不重复添加
+                }
+            }
+        }
     }
 
     /**
@@ -169,19 +204,19 @@ public class RAGMessagesHook extends MessagesModelHook {
             
             如果参考信息中没有相关内容，请使用你的通用知识。
             """, context);
-        modified.add(new SystemMessage(systemPrompt));
 
-        // 2. 添加原始消息（排除原来的系统消息）
-        for (Message msg : original) {
-            if (!(msg instanceof SystemMessage)) {
-                if (msg instanceof UserMessage) {
-                    // 使用精简的用户问题
-                    modified.add(new UserMessage(userQuestion));
-                } else {
-                    modified.add(msg);
-                }
+        for (Message message : original) {
+            if (message instanceof UserMessage) {
+                modified.add(message);
+            }else if (message instanceof SystemMessage) {
+                modified.add(new SystemMessage(systemPrompt));
+            }else {
+                modified.add(message);
             }
         }
+
+        // 2. 添加原始消息（排除原来的系统消息）
+        modified.addAll(original);
 
         return modified;
     }

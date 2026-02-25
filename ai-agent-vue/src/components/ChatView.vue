@@ -35,7 +35,7 @@ import {
   removeUploadedFile,
   clearUploadedFiles
 } from '../stores/chat.js'
-import { chat, streamChat } from '../api/chat.js'
+import { chat, streamChat, chatWithFiles } from '../api/chat.js'
 
 const inputText = ref('')
 const loading = ref(false)
@@ -50,6 +50,8 @@ const handleFileRemove = (id) => removeUploadedFile(id)
 const handleSend = async () => {
   const text = inputText.value.trim()
   const files = [...uploadedFiles.value]
+  // 只保留实际可上传的 File/Blob 对象（localStorage 恢复的元数据可能没有 file 字段）
+  const sendFiles = files.map(f => (f && (f.file || f.blob || f))).filter(x => x instanceof Blob)
   if (!text && files.length === 0) return
   if (!currentSession.value) {
     const s = createSession(); switchSession(s); addMessage('AI', '欢迎回来！')
@@ -71,20 +73,25 @@ const handleSend = async () => {
   let aiIndex = messages.value.length - 1
   const threadId = currentSession.value.id
 
-  try {
-    if (useStreamingApi.value) {
-      let buffer = ''
-      await streamChat(text, threadId, (chunk) => {
-        if (buffer === '') { buffer = chunk; updateMessage(aiIndex, buffer) }
-        else { buffer += chunk; updateMessage(aiIndex, buffer) }
-      }, () => { loading.value = false }, (err) => { updateMessage(aiIndex, '处理出错'); loading.value = false }, selectedModel.value)
-    } else {
-      try {
-        const resp = await chat(text, threadId, selectedModel.value)
+    try {
+      if (sendFiles.length > 0 && !useStreamingApi.value) {
+        // 有文件且选择同步接口时，走 multipart 上传（仅实际文件）
+        const resp = await chatWithFiles(text, threadId, sendFiles, selectedModel.value)
         updateMessage(aiIndex, resp)
-      } catch (e) { updateMessage(aiIndex, '调用接口出错：' + (e.message||e)) }
-      finally { loading.value = false }
-    }
+        loading.value = false
+      } else if (useStreamingApi.value) {
+        let buffer = ''
+        await streamChat(text, threadId, (chunk) => {
+          if (buffer === '') { buffer = chunk; updateMessage(aiIndex, buffer) }
+          else { buffer += chunk; updateMessage(aiIndex, buffer) }
+        }, () => { loading.value = false }, (err) => { updateMessage(aiIndex, '处理出错'); loading.value = false }, selectedModel.value, sendFiles)
+      } else {
+        try {
+          const resp = await chat(text, threadId, selectedModel.value)
+          updateMessage(aiIndex, resp)
+        } catch (e) { updateMessage(aiIndex, '调用接口出错：' + (e.message||e)) }
+        finally { loading.value = false }
+      }
   } catch (e) {
     console.error(e); addMessage('AI', '发送失败：' + (e.message||e)); loading.value = false
   }
