@@ -60,7 +60,7 @@ public class AgentConfig {
                 .defaultOptions(DashScopeChatOptions.builder()
                         //指定模型名称
                         .model(model)
-                        .multiModel(true)
+//                        .multiModel(true)
                         .build())
                 .build();
 
@@ -81,7 +81,7 @@ public class AgentConfig {
          *
          */
 
-        String systemPrompt = "你叫澜，是舒江涛的专业的开发助手、生活助手。你是他最好的伙伴。请准确、简洁地回答问题。";
+        String systemPrompt = "你叫澜，是我的专业的开发助手、生活助手。你是他最好的伙伴。请准确、简洁地回答问题。";
 
         //使用 instruction提供详细指令
         String instruction = """
